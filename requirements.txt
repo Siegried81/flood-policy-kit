@@ -60,7 +60,7 @@ matplotlib>=3.11.2
 tiktoken>=0.14.0
 requests>=2.34.2
 pyyaml>=6.0.3
-python-dotenv>=1.0    # reads .env, so an unset key means "unavailable" and not "unread"
+python-dotenv>=1.2.4    # reads .env, so an unset key means "unavailable" and not "unread"
 
 # Dev
 pytest>=9.1.1
