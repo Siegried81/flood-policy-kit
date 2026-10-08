@@ -1,0 +1,17 @@
+name: tests
+
+# Offline by design: the suite must pass with no network, because on the day the
+# venue Wi-Fi is the first thing to fail.
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m pytest -q

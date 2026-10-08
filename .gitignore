@@ -1,0 +1,30 @@
+# Data: large, re-downloadable from config/sources.yaml via src/fetch.py
+data/
+!data/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Secrets
+.env
+.streamlit/secrets.toml
+
+# OS
+.DS_Store
+
+# Node
+node_modules/
+web/dist/
+
+# Local working state, never committed: see _build/STATE.md
+_build/
+
+# Streamlit's dataframe toolbar writes `<timestamp>_export.csv`, and the browser
+# drops it wherever it drops downloads - often the repo root. It is a view of a
+# frozen table at one return period, never a source: `data/processed/` holds the
+# tables and `config/sources.yaml` the inputs.
+*_export.csv
