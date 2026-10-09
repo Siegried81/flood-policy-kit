@@ -1342,3 +1342,26 @@ The two tests moved the suite to 532 and every marked block went stale at once;
 (8 → 10) and re-summed to the marked total.
 
 Tests: **532 passed, 0 failed.**
+
+## 2026-10-09 — the React map framed the overseas regions and shrank Europe to a strip
+
+Reported with a screenshot: "the map looks like nothing, it has become tiny, and
+I cannot zoom". The screenshot was the React front-end (`web/`), not the
+Streamlit map repaired on 8 October, and `web/src/components/Choropleth.jsx` had
+not changed since the first commit: it computed its viewBox over every feature,
+so the Canaries, Madeira, the Azores, the French overseas regions and Svalbard
+set the frame.
+
+**Measured on `regions.geojson`** (1,345 features, 16 of them outermost): the
+extent spans **119.0 × 102.2 degrees** with them and **69.3 × 36.6** without —
+**4.8 times the area** given to a continent that fills a fifth of it. The same
+defect `src/svgmap.py` closes with `OUTERMOST`, now mirrored in the React
+component: the 16 regions are still drawn and still in every figure and the
+table, they just no longer set the frame, and the caption says how many sit
+outside it. Nothing in the code intercepts Ctrl+scroll; the browser zoom was
+slow on a 1,345-path inline SVG and mostly needed because the continent was
+small.
+
+No measurement changed meaning: the map is display only; every number arrives
+aggregated from the API in EPSG:3035. `npm run build` passes (there are no
+front-end tests in this repo). Confirmed on screen by the reader.

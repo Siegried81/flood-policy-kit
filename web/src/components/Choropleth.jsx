@@ -21,6 +21,15 @@ import React, { useMemo, useState } from "react";
 const RAMP = ["#ffffb2", "#fed976", "#feb24c", "#fd8d3c", "#f03b20", "#bd0026"];
 const NO_DATA = "#d9d9d9";
 
+// Regions drawn but kept OUT of the frame, mirrored from src/svgmap.py: the
+// Canaries, Madeira, the Azores, the French overseas regions and Svalbard. With
+// them in the extent the viewBox spans 119 x 102 degrees against 69 x 37
+// without - 4.8 times the area, measured on regions.geojson on 2026-10-09 -
+// and the continent shrinks to a strip in the top right. They are still drawn (off
+// frame) and counted in the caption, never dropped from the data.
+const OUTERMOST = ["FRY", "PT20", "PT30", "ES70", "NO0B"];
+const isOutermost = (id) => OUTERMOST.some((prefix) => String(id ?? "").startsWith(prefix));
+
 /** Quantile breaks, so the classes carry roughly equal counts.
  *
  * Equal-interval breaks on a long-tailed distribution — which exposure always is,
@@ -54,7 +63,7 @@ function ringsOf(geometry) {
 export default function Choropleth({ geojson, values, valueKey, idKey, label }) {
   const [hover, setHover] = useState(null);
 
-  const { paths, breaks, bounds } = useMemo(() => {
+  const { paths, breaks, bounds, offFrame } = useMemo(() => {
     const features = geojson?.features ?? [];
     const numbers = features.map((f) => values.get(f.properties?.[idKey]));
     const breaks = quantileBreaks(numbers, RAMP.length);
@@ -62,7 +71,12 @@ export default function Choropleth({ geojson, values, valueKey, idKey, label }) 
     // One pass for the extent: the viewBox has to fit the data, not a hard-coded
     // bounding box, so the same component works for Europe or for one valley.
     let [minX, minY, maxX, maxY] = [Infinity, Infinity, -Infinity, -Infinity];
+    let offFrame = 0;
     for (const feature of features) {
+      if (isOutermost(feature.properties?.[idKey])) {
+        offFrame += 1;
+        continue;
+      }
       for (const ring of ringsOf(feature.geometry)) {
         for (const [x, y] of ring) {
           if (x < minX) minX = x;
@@ -85,7 +99,7 @@ export default function Choropleth({ geojson, values, valueKey, idKey, label }) 
         .join(" ");
       return { id, d, value: values.get(id), name: feature.properties?.name ?? id };
     });
-    return { paths, breaks, bounds: [minX, -maxY, maxX - minX, maxY - minY] };
+    return { paths, breaks, offFrame, bounds: [minX, -maxY, maxX - minX, maxY - minY] };
   }, [geojson, values, idKey]);
 
   if (!geojson) return null;
@@ -122,6 +136,13 @@ export default function Choropleth({ geojson, values, valueKey, idKey, label }) 
         {label} · quantile classes, so the map shows the ranking rather than a long
         tail. “Not measured” is a region the hazard raster does not cover — not a
         region with nobody exposed.
+        {offFrame > 0 && (
+          <>
+            {" "}
+            {offFrame} outermost regions (Canaries, Madeira, Azores, French overseas,
+            Svalbard) are outside this frame; they are in every figure and in the table.
+          </>
+        )}
       </figcaption>
     </figure>
   );
