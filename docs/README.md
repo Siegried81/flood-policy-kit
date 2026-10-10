@@ -3,7 +3,7 @@
 These pages record what the kit measures, why it is built the way it is, and
 what a jury at the European AI Challenge 2026 (JRC x FARI, 29-30 October) is
 scoring: a map, a two-page policy brief, a reflection on the responsible use of
-AI, and a three-minute pitch. Seventeen files, 385 KB measured on 2026-10-08.
+AI, and a three-minute pitch. Eighteen files, 385 KB measured on 2026-10-08 plus `n8n_export.md` on 2026-10-10.
 Most of that is background written before the data was frozen; the argument
 itself is short, and this page exists so a reader opens it first rather than a
 60 KB reference.
@@ -37,6 +37,7 @@ so re-measure rather than quote.
 | [`policy_context.md`](policy_context.md) | The EU flood-risk policy framework researched for the RAG corpus and the brief: the Floods Directive cycle, Sendai, civil protection, the insurance gap, the July 2021 figures, the AI Act, with a verification flag on every claim and twelve open items. | 63.3 |
 | [`policy_craft.md`](policy_craft.md) | How a brief, a pitch and a decision-maker's map are judged: BLUF, the recommendation sentence template, the two-page skeleton, uncertainty wording, and why teams lose. | 52.9 |
 | [`workflow.md`](workflow.md) | Why the brief pipeline is a fixed five-node graph and not an agent: the four guards, the approval gate, idempotent fetching, and verification done in Python rather than by a model. | 5.4 |
+| [`n8n_export.md`](n8n_export.md) | Versioning n8n workflows in git: what it buys, the API key, the commands, what is normalised away, the secret guard, the nightly GitHub Action and the reusable job for every repository. | 10.7 |
 | [`roles.md`](roles.md) | The three hats of the integrator (decision framing, exposure analysis, GenAI), how a five-person team splits, and the two rules that save the deliverable. | 4.4 |
 | [`plan.md`](plan.md) | The 23-day preparation calendar from 6 October: registration, the download, the kit, the GenAI layer, and the dress rehearsal on a region nobody prepared. | 5.5 |
 | [`day_of.md`](day_of.md) | The checklist before leaving home, the hour-by-hour shape of the two days, the three-minute pitch, and the questions to have an answer ready for. | 5.1 |
@@ -55,6 +56,8 @@ so re-measure rather than quote.
 5. [`technical_deep_dive.md`](technical_deep_dive.md): what each column means
    and how the pipeline keeps the headline additive.
 6. [`workflow.md`](workflow.md): why there is a human gate and no agent.
+   [`n8n_export.md`](n8n_export.md) is the tooling note beside it: how the
+   n8n automations get a git history.
 7. [`datasets.md`](datasets.md) and
    [`geospatial_crash_course.md`](geospatial_crash_course.md): the reference
    half, read when a source or a number needs checking.

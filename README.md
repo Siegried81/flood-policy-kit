@@ -97,6 +97,7 @@ flood-policy-kit/
 │   ├── toon_io.py              # compact table encoding for LLM prompts
 │   ├── fetch.py                # parallel, polite, idempotent collection
 │   ├── workflow.py             # LangGraph brief pipeline with an approval gate
+│   ├── n8n_export.py           # n8n workflows -> git, as diff-stable JSON; standalone, reusable from any repo
 │   └── rag.py                  # grounded "cite or refuse" over the policy corpus
 ├── scripts/
 │   ├── build_exposure.py            # freezes data/processed/exposure.parquet, one row per NUTS3 x RP
@@ -130,7 +131,7 @@ of them. Windows Smart App Control then moved to enforcement on 2026-10-07 and
 refused `rasterio`'s own GDAL build, which no pin fixed; by 2026-10-08 it allowed
 the same wheel again with nothing reinstalled. **The policy moves both ways, so
 measure rather than believe either state** — measured 2026-10-08, `import
-rasterio` works and the whole suite runs on Windows: **<!-- numbers:tests_collected -->532<!-- /numbers --> passed, nothing
+rasterio` works and the whole suite runs on Windows: **<!-- numbers:tests_collected -->572<!-- /numbers --> passed, nothing
 deselected**. The WSL2 venv stays anyway, because it is the only route that does
 not depend on the policy's mood and it is where a continental raster build
 belongs. **Neither container has ever been built:** the Docker daemon is not running on this machine, so both are
@@ -158,12 +159,13 @@ rather than on the morning of the event.
 | [`docs/limitations.md`](docs/limitations.md) | What the figures cannot say, what was designed and not built, what an authority would still have to do, and the risks accepted to ship in ten days |
 | [`docs/ai_usage_log.md`](docs/ai_usage_log.md) | The AI-usage annex the responsible-AI deliverable asks for |
 | [`docs/technical_deep_dive.md`](docs/technical_deep_dive.md) | How it works and why it is built that way: the four CRSs, what the exposure number means, why the windows are on the population grid, the UI contract, what each test guards |
+| [`docs/n8n_export.md`](docs/n8n_export.md) | Versioning n8n workflows in git: what it buys, the API key, the commands, what is normalised away, the secret guard, the nightly GitHub Action, and the one reusable job that serves every repository |
 
 ## Quick start
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m pytest -q           # <!-- numbers:tests_collected -->532<!-- /numbers --> tests, offline: no network, no model
+.venv/bin/python -m pytest -q           # <!-- numbers:tests_collected -->572<!-- /numbers --> tests, offline: no network, no model
                                         # Measured 2026-10-08 on Windows, nothing
                                         # deselected. Smart App Control blocked
                                         # rasterio on 2026-10-07 and allowed it
@@ -180,6 +182,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python scripts/build_geometry.py             # -> data/processed/regions.geojson
 .venv/bin/python scripts/check_offline_readiness.py   # exits 1 if the demo needs the network
 .venv/bin/python scripts/docs_numbers.py --check      # exits 1 if a doc's number no longer matches the code
+.venv/bin/python -m src.n8n_export --commit          # n8n workflows -> n8n/workflows/*.json, committed (docs/n8n_export.md)
 
 # Either UI. Both read the same frozen table, so they cannot disagree on a number.
 .venv/bin/streamlit run app/streamlit_app.py            # no build step

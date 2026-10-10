@@ -1,0 +1,82 @@
+name: n8n export
+
+# Nightly backup of every n8n workflow into git - and the reusable job any other
+# repository can call with a ten-line workflow, so the exporter lives here once
+# rather than as a copy per repo (see docs/n8n_export.md, "all your repos").
+#
+# Needs two repository secrets, N8N_URL and N8N_API_KEY (Settings > Secrets and
+# variables > Actions). Without them the job ends green with a notice, so the
+# schedule costs nothing until an instance is configured. The n8n instance must
+# be reachable from GitHub's runners: n8n Cloud or a self-hosted one with a
+# public URL. An n8n on a laptop (localhost:5678) is not, and for that one the
+# same command runs locally: `python -m src.n8n_export --commit --push`.
+
+on:
+  schedule:
+    - cron: "17 3 * * *"        # 03:17 UTC daily, off the hour where runners queue
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      out_dir:
+        description: Folder in the calling repository that mirrors the instance
+        type: string
+        default: n8n/workflows
+      tag:
+        description: Export only the workflows carrying this n8n tag (empty = all)
+        type: string
+        default: ""
+      exporter_ref:
+        description: Branch, tag or SHA of flood-policy-kit to take src/n8n_export.py from
+        type: string
+        default: main
+    secrets:
+      N8N_URL:
+        required: true
+      N8N_API_KEY:
+        required: true
+
+permissions:
+  contents: write   # the job commits and pushes the export folder
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      # The repository that receives the export: this one on the schedule, the
+      # caller's under workflow_call. Its token is what the final push uses.
+      - uses: actions/checkout@v7
+
+      # The exporter is ONE file, taken from this repository by sparse checkout so
+      # a caller never copies it. `persist-credentials: false`: nothing is pushed
+      # back to the tool's repository.
+      - uses: actions/checkout@v7
+        with:
+          repository: Siegried81/flood-policy-kit
+          ref: ${{ inputs.exporter_ref || 'main' }}
+          sparse-checkout: src/n8n_export.py
+          sparse-checkout-cone-mode: false
+          path: .n8n-export-tool
+          persist-credentials: false
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - run: pip install requests
+
+      - name: Export, commit, push
+        env:
+          N8N_URL: ${{ secrets.N8N_URL }}
+          N8N_API_KEY: ${{ secrets.N8N_API_KEY }}
+          OUT_DIR: ${{ inputs.out_dir || 'n8n/workflows' }}
+          N8N_TAG: ${{ inputs.tag }}
+        run: |
+          if [ -z "$N8N_URL" ] || [ -z "$N8N_API_KEY" ]; then
+            echo "::notice::N8N_URL / N8N_API_KEY are not set as repository secrets; nothing to export."
+            exit 0
+          fi
+          git config user.name "n8n-export"
+          git config user.email "n8n-export@users.noreply.github.com"
+          # --no-backup: the remote IS the backup here, and a bundle on a runner is lost with it.
+          python .n8n-export-tool/src/n8n_export.py --out "$OUT_DIR" ${N8N_TAG:+--tag "$N8N_TAG"} \
+            --commit --push --no-backup
