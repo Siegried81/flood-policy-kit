@@ -1438,3 +1438,23 @@ total is tiny), which the per-region table can settle and this entry does not.
 Not done, and for the audit's own reasons: `main` is unprotected on GitHub
 (a repository setting, not a file), and no cost, p95 or restoration drill was
 measured.
+
+## 2026-10-10 — The Ollama default is the model the laptop has
+
+**What.** `src/rag.py` falls back to `llama3.2:3b` instead of `llama3.1` when
+`OLLAMA_MODEL` is unset; `.env.example`, the readiness checker's restated
+constant and `docs/limitations.md` follow, and a test pins the constant to the
+line in `rag.py`.
+
+**Why.** The laptop has `llama3.2:3b` pulled and `.env` says so, but the
+container reads no `.env`, so it asked Ollama for `llama3.1`, which is not
+there: the demo worked on the host and failed in the image with "model not
+found". One name everywhere removes the one-word trap the readiness check was
+written to catch.
+
+**Revisit if** a larger model is pulled for the day: change the constant in
+`rag.py`, and the test says where else.
+
+Also recorded: the `wallonia_observed_water_depth_2021` url is a one-off
+download job of the Walloon geoportal and expires; `sources.yaml` now says so
+in the entry's caveat, so the next 404 reads as "request the download again".

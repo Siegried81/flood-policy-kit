@@ -271,10 +271,13 @@ Only what the repository shows.
   [`decisions.md`, 2026-10-08 "cached there is no table"](decisions.md#2026-10-08--the-page-cached-there-is-no-table-and-never-looked-again).
 - **The offline check fails today.** Run 2026-10-08: 51 of 52 declared files
   present (3.8 GiB), `wallonia_observed_water_depth_2021` missing behind a dead
-  URL; `GROQ_API_KEY` set, so the draft tab goes over the network; the local
-  model pulled is `llama3.2:3b` while `src/rag.py` defaults to `llama3.1`.
-  Exit code 1. The check also skips every `access: api` source, so the Risk Data
-  Hub, the basin districts and the CDS files are outside what it can certify.
+  URL (a one-off download job of the Walloon geoportal, to be requested again);
+  `GROQ_API_KEY` set, so the draft tab goes over the network. Exit code 1.
+  `src/rag.py` now defaults to `llama3.2:3b`, the model the demo laptop has
+  pulled, so a container started without `.env` asks for the same name. The
+  check skips every `access: api` source, so the Risk Data Hub is covered only
+  through its cache check, and the basin districts and the CDS files through
+  their own WARN checks.
   [`scripts/check_offline_readiness.py`](../scripts/check_offline_readiness.py),
   root [`README.md`](../README.md).
 - **Dead configuration keys.** `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` and

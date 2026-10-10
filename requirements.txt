@@ -25,7 +25,7 @@ shapely>=2.1.2
 # logged as CodeIntegrity 3077/3089/3118, with no pin that fixed it - and by
 # 2026-10-08 around 11:00 it allowed the same wheel again with nothing
 # reinstalled. Measured 2026-10-08: `import rasterio` succeeds and the WHOLE
-# suite runs on Windows, <!-- numbers:tests_collected -->550<!-- /numbers --> passed
+# suite runs on Windows, <!-- numbers:tests_collected -->551<!-- /numbers --> passed
 # and nothing deselected (the count is written by scripts/docs_numbers.py).
 #
 # Keep the WSL2 venv (`~/.venvs/flood` on Ubuntu) anyway: it is the only route

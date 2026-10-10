@@ -326,8 +326,8 @@ down in advance.
 
 ## 7. The test suite
 
-**<!-- numbers:tests_collected -->550<!-- /numbers --> tests, offline**: no network, no model, no key. Measured 8 October 2026 on
-Windows: all <!-- numbers:tests_collected -->550<!-- /numbers --> collect and pass, nothing deselected. Do not quote that as a
+**<!-- numbers:tests_collected -->551<!-- /numbers --> tests, offline**: no network, no model, no key. Measured 8 October 2026 on
+Windows: all <!-- numbers:tests_collected -->551<!-- /numbers --> collect and pass, nothing deselected. Do not quote that as a
 property of the platform — Smart App Control moved to enforcement on 7 October
 2026 and refused rasterio's unsigned DLLs, which left 433 collectable and 431
 passing on Windows while WSL2 ran the lot; by the next morning it allowed the
@@ -350,7 +350,7 @@ summed to 473, a figure that had survived three suite changes by being typed.
 
 | File | Tests | Guards |
 |---|---|---|
-| `test_offline_readiness.py` | 51 | the demo runs with the Wi-Fi off: the three verdicts, `--strict`, a rejected file is not present, the two caches `src.fetch` does not fill |
+| `test_offline_readiness.py` | 52 | the demo runs with the Wi-Fi off: the three verdicts, `--strict`, a rejected file is not present, the two caches `src.fetch` does not fill |
 | `test_validate.py` | 50 | the scoring grid, the three metrics, `None` vs `0.0` |
 | `test_api.py` | 48 | the eleven routes, the 404s that name their builder, the JSX guards |
 | `test_streamlit_app.py` | 47 | the fallback UI, the translation tab, the climate and coverage caveats |
@@ -388,7 +388,7 @@ zonal statistic is the right arithmetic on the wrong piece of Europe. Measured o
 
 | Claim | Source |
 |---|---|
-| <!-- numbers:tests_collected -->550<!-- /numbers --> tests | `scripts/docs_numbers.py --write`, which runs `pytest --collect-only` and rewrites the marked blocks; the per-file counts are typed by hand |
+| <!-- numbers:tests_collected -->551<!-- /numbers --> tests | `scripts/docs_numbers.py --write`, which runs `pytest --collect-only` and rewrites the marked blocks; the per-file counts are typed by hand |
 | 52 files, ≈3.82 GiB | `src.fetch.expand()` over `config/sources.yaml` |
 | <!-- numbers:sources_declared -->42<!-- /numbers --> declared inputs, <!-- numbers:sources_verified -->34<!-- /numbers --> with a verification date, <!-- numbers:sources_licensed -->11<!-- /numbers --> with an explicit `licence:` | `scripts/docs_numbers.py` over `config/sources.yaml`: entries with an `id`; `verified` not null; `licence` non-empty |
 | 1,345 NUTS3 polygons | the GISCO NUTS 2024 file itself |

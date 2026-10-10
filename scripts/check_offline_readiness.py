@@ -50,7 +50,7 @@ are the only offline route to an observed loss figure. An empty cache means the
 validation half of the brief has nothing behind it.
 
 **Ollama, and the model the code actually defaults to.** `src/rag.py` falls back
-to Ollama when no Groq key is set, with `llama3.1` as its default model name. A
+to Ollama when no Groq key is set, with `llama3.2:3b` as its default model name. A
 reachable Ollama holding a *different* model is the trap worth checking for: the
 request reaches the right port and is refused by the wrong name, which reads as a
 dead model server rather than as a one-word configuration fix.
@@ -94,7 +94,7 @@ from src.rdh import COLLECTIONS as RDH_COLLECTIONS  # noqa: E402
 # The default `src/rag.py` hands to Ollama when OLLAMA_MODEL is unset. Restated
 # here rather than imported because rag.py reads it inline in `complete()` and
 # exposes no constant to import; if that default ever moves, move this with it.
-RAG_DEFAULT_OLLAMA_MODEL = "llama3.1"
+RAG_DEFAULT_OLLAMA_MODEL = "llama3.2:3b"
 # Where `src/basins.py` caches the EEA river-basin layer and where `src/climate.py`
 # reads the hand-downloaded CDS files, both relative to the data directory.
 # Restated rather than imported, and for a reason this script lives by: both
@@ -475,7 +475,7 @@ def check_ollama(url: str | None = None, model: str | None = None) -> Check:
     The model name is read from the environment using `src/rag.py`'s own default,
     so this checks what the demo will really request rather than what `.env`
     hopes for. A model pulled under a different tag is called out by name: the
-    gap between `llama3.1` and `llama3.2:3b` is a one-word edit, but only for
+    gap between `llama3.2:3b` and `llama3.2:1b` is a one-word edit, but only for
     someone who is told which word.
     """
     url = url or os.getenv("OLLAMA_URL", "http://localhost:11434")

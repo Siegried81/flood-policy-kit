@@ -340,15 +340,24 @@ def test_the_code_default_being_pulled_is_clean(monkeypatch):
 
 
 def test_a_different_model_is_ok_but_the_mismatch_is_stated(monkeypatch):
-    """The live case: OLLAMA_MODEL=llama3.2:3b while src/rag.py defaults to llama3.1.
+    """OLLAMA_MODEL names a model other than the one src/rag.py defaults to.
 
     It works, and it stops working the moment .env is absent - which is exactly
     what happens in a fresh container, so the caveat is part of the answer.
     """
-    monkeypatch.setattr(readiness, "_ollama_tags", lambda url: ["llama3.2:3b"])
-    check = readiness.check_ollama(url="http://localhost:11434", model="llama3.2:3b")
+    monkeypatch.setattr(readiness, "_ollama_tags", lambda url: ["qwen2.5:3b"])
+    check = readiness.check_ollama(url="http://localhost:11434", model="qwen2.5:3b")
     assert check.status == "OK"
     assert readiness.RAG_DEFAULT_OLLAMA_MODEL in check.detail
+
+
+def test_the_code_default_matches_what_rag_py_asks_for():
+    """The constant is restated here (rag.py reads it inline); a drift between the
+    two is a check that certifies the wrong model."""
+    import re
+
+    source = (ROOT / "src" / "rag.py").read_text(encoding="utf-8")
+    assert re.search(r'os\.getenv\("OLLAMA_MODEL",\s*"' + re.escape(readiness.RAG_DEFAULT_OLLAMA_MODEL) + '"\)', source)
 
 
 def test_wrong_tag_in_the_same_family_suggests_the_one_word_fix(monkeypatch):

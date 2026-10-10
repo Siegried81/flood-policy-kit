@@ -413,7 +413,10 @@ def _ollama(prompt: str, system: str) -> str:
     response = requests.post(
         f"{os.getenv('OLLAMA_URL', 'http://localhost:11434')}/api/chat",
         json={
-            "model": os.getenv("OLLAMA_MODEL", "llama3.1"),
+            # The default is the model the demo laptop actually has pulled, so a
+            # container started without .env asks Ollama for the same name as
+            # the host. scripts/check_offline_readiness.py restates it.
+            "model": os.getenv("OLLAMA_MODEL", "llama3.2:3b"),
             "messages": _messages(prompt, system),
             "stream": False,
         },

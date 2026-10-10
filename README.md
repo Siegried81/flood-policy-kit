@@ -130,7 +130,7 @@ of them. Windows Smart App Control then moved to enforcement on 2026-10-07 and
 refused `rasterio`'s own GDAL build, which no pin fixed; by 2026-10-08 it allowed
 the same wheel again with nothing reinstalled. **The policy moves both ways, so
 measure rather than believe either state** — measured 2026-10-08, `import
-rasterio` works and the whole suite runs on Windows: **<!-- numbers:tests_collected -->550<!-- /numbers --> passed, nothing
+rasterio` works and the whole suite runs on Windows: **<!-- numbers:tests_collected -->551<!-- /numbers --> passed, nothing
 deselected**. The WSL2 venv stays anyway, because it is the only route that does
 not depend on the policy's mood and it is where a continental raster build
 belongs. **Neither container has ever been built:** the Docker daemon is not running on this machine, so both are
@@ -163,7 +163,7 @@ rather than on the morning of the event.
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m pytest -q           # <!-- numbers:tests_collected -->550<!-- /numbers --> tests, offline: no network, no model
+.venv/bin/python -m pytest -q           # <!-- numbers:tests_collected -->551<!-- /numbers --> tests, offline: no network, no model
                                         # Measured 2026-10-08 on Windows, nothing
                                         # deselected. Smart App Control blocked
                                         # rasterio on 2026-10-07 and allowed it
