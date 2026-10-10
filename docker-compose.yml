@@ -111,7 +111,8 @@ services:
 
   # Does this machine still work with the network unplugged? One-shot, and its
   # exit code is the answer, so it can be the last thing run before closing the
-  # laptop on 28 October.
+  # laptop on 28 October. Arguments are appended, so that last run is
+  # `run --rm check --strict`: a WARN (a Groq key still set) then blocks too.
   check:
     <<: *app-common
     profiles: ["tools"]

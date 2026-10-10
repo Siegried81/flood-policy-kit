@@ -377,9 +377,10 @@ def test_the_svg_actually_reaches_the_page_not_just_the_caption():
     srcdoc is the only assertion here that can tell a drawn map from a
     confident sentence about one.
 
-    `<title>`, not a fill colour: there is one per region path and the legend
-    swatches carry none, so counting fills counts the legend too - a mistake
-    this test was written around.
+    A titled `<path>`, not a fill colour and not a bare `<title>`: the legend
+    swatches carry a fill and, since they name their quantile rank, a tooltip of
+    their own - so counting either counts the legend too, a mistake this test
+    was written around twice.
     """
     table = _nested_table()
     features = [
@@ -397,8 +398,11 @@ def test_the_svg_actually_reaches_the_page_not_just_the_caption():
     assert len(frames) == 1, f"{len(frames)} iframes; the map is the only one"
     markup = frames[0].srcdoc
     assert "<svg" in markup, "the map was enqueued as something other than SVG"
-    assert markup.count("<title>") == len(features), (
-        f"{markup.count('<title>')} titled paths for {len(features)} regions"
+    import re
+
+    titled_paths = len(re.findall(r"<path [^>]*><title>", markup))
+    assert titled_paths == len(features), (
+        f"{titled_paths} titled paths for {len(features)} regions"
     )
     # And every region is reachable by name, which is what the hover promises.
     for feature in features:

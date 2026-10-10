@@ -130,7 +130,7 @@ of them. Windows Smart App Control then moved to enforcement on 2026-10-07 and
 refused `rasterio`'s own GDAL build, which no pin fixed; by 2026-10-08 it allowed
 the same wheel again with nothing reinstalled. **The policy moves both ways, so
 measure rather than believe either state** — measured 2026-10-08, `import
-rasterio` works and the whole suite runs on Windows: **<!-- numbers:tests_collected -->532<!-- /numbers --> passed, nothing
+rasterio` works and the whole suite runs on Windows: **<!-- numbers:tests_collected -->550<!-- /numbers --> passed, nothing
 deselected**. The WSL2 venv stays anyway, because it is the only route that does
 not depend on the policy's mood and it is where a continental raster build
 belongs. **Neither container has ever been built:** the Docker daemon is not running on this machine, so both are
@@ -163,7 +163,7 @@ rather than on the morning of the event.
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m pytest -q           # <!-- numbers:tests_collected -->532<!-- /numbers --> tests, offline: no network, no model
+.venv/bin/python -m pytest -q           # <!-- numbers:tests_collected -->550<!-- /numbers --> tests, offline: no network, no model
                                         # Measured 2026-10-08 on Windows, nothing
                                         # deselected. Smart App Control blocked
                                         # rasterio on 2026-10-07 and allowed it
@@ -179,6 +179,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python scripts/build_context.py  --stripes 72 # -> data/processed/context.parquet
 .venv/bin/python scripts/build_geometry.py             # -> data/processed/regions.geojson
 .venv/bin/python scripts/check_offline_readiness.py   # exits 1 if the demo needs the network
+.venv/bin/python scripts/check_offline_readiness.py --strict  # evening before: a WARN blocks too
 .venv/bin/python scripts/docs_numbers.py --check      # exits 1 if a doc's number no longer matches the code
 
 # Either UI. Both read the same frozen table, so they cannot disagree on a number.
@@ -235,6 +236,13 @@ Three sources sit outside `python -m src.fetch`, and each for its own reason:
   its 1000 cap. Drop the `.nc` files in
   `data/raw/download/cds_hydrology_projections/`.
 
-None of the three is covered by `scripts/check_offline_readiness.py`, which skips
-`access: api` entries — so a green readiness check does not mean these are in
-place. See [`docs/datasets.md`](docs/datasets.md).
+`scripts/check_offline_readiness.py` skips `access: api` entries, so none of the
+three appears in its per-file table — but all three have a check of their own:
+the RDH cache is a **FAIL** when empty (it is the only offline route to a loss
+figure), the basins cache and the CDS folder are **WARN** when absent (the map
+and the brief run without them; the shared-basin and climate layers simply say
+so). The verdict has three states — `READY`, `READY WITH CAVEATS`, `BLOCKED` —
+and `--strict` turns every caveat into a block, which is the mode to run the
+evening before: a `GROQ_API_KEY` left in `.env` is a caveat on any other day and
+the thing that routes the demo through the venue Wi-Fi on that one. See
+[`docs/datasets.md`](docs/datasets.md).

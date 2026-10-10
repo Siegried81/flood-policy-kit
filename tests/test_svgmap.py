@@ -78,6 +78,60 @@ def test_a_key_absent_from_the_values_is_also_grey():
     assert len(fills) == 2
 
 
+# --- the legend -----------------------------------------------------------------
+#
+# The classes are quantiles, and a legend that prints only "10.6% to 75.5%" for
+# the last one reads as a danger band rather than as the top sixth. The rank is
+# printed, the count is in the tooltip, and every entry has to be on screen.
+
+
+def _legend_rects(svg):
+    """(x, y) of every legend swatch: the rects, which only the legend draws."""
+    import re
+
+    return [(float(x), float(y)) for x, y in re.findall(r'<rect x="([\d.]+)" y="([\d.]+)"', svg)]
+
+
+def _map_bottom(svg):
+    """The lowest y any region path reaches."""
+    import re
+
+    ys = [float(y) for d in re.findall(r'<path d="([^"]+)"', svg)
+          for _, y in re.findall(r"([\d.-]+),([\d.-]+)", d)]
+    return max(ys)
+
+
+def test_the_legend_names_the_quantile_rank_and_the_count():
+    features = [_square(f"R{i}", 4 + i, 50) for i in range(12)]
+    svg = svgmap.choropleth_svg(
+        features, {f"R{i}": i / 100 for i in range(12)}, percent=True, extent_excludes=()
+    )
+    assert "1/6 · 0.0% to 1.0%" in svg
+    assert "6/6 · " in svg
+    assert "<title>class 6 of 6: 2 regions, equal-count (quantile) classes</title>" in svg
+
+
+def test_every_legend_entry_is_inside_the_viewbox_and_below_the_map():
+    """Eight entries on one 150-unit pitch ran to x=1,062 in a 900-wide viewBox:
+    "not measured" and the hatch swatch were drawn and clipped. They wrap now,
+    and the map stops above the band they occupy."""
+    features = [_square(f"R{i}", 4 + i, 50) for i in range(12)]
+    values = {f"R{i}": i / 100 for i in range(12)}
+    svg = svgmap.choropleth_svg(features, values, hatch=("R3",), extent_excludes=())
+    rects = _legend_rects(svg)
+    assert len(rects) == 8                          # 6 classes + not measured + hatch
+    assert all(x + 14 <= 900 for x, _ in rects), "a legend entry is off the right edge"
+    assert len({y for _, y in rects}) == 2, "eight entries need two rows at 900 wide"
+    assert _map_bottom(svg) <= min(y for _, y in rects), "the map runs under the legend"
+
+
+def test_a_wide_viewport_keeps_the_legend_on_one_row():
+    features = [_square(f"R{i}", 4 + i, 50) for i in range(12)]
+    values = {f"R{i}": i / 100 for i in range(12)}
+    svg = svgmap.choropleth_svg(features, values, width=1400, extent_excludes=())
+    assert len({y for _, y in _legend_rects(svg)}) == 1
+
+
 # --- the projection -------------------------------------------------------------
 
 def test_north_is_up_and_east_is_right():

@@ -431,6 +431,62 @@ def _target_path(source_id: str, url: str, kind: str) -> Path:
     return DATA / "raw" / kind / f"{source_id}{suffix}"
 
 
+#: Bytes of a file's head that `_why_not_a_document` needs: the WAF and
+#: directory-listing markers all sit in the first page of a rejection body.
+HEAD_BYTES = 4096
+
+
+def read_head(path: Path) -> bytes:
+    """The first `HEAD_BYTES` of a file - enough to recognise a rejection page."""
+    with path.open("rb") as handle:
+        return handle.read(HEAD_BYTES)
+
+
+def sha256_of(path: Path) -> str:
+    """SHA-256 of a file on disk, read in `CHUNK_BYTES` pieces.
+
+    Streamed for the same reason the download is: the reuse path in `_fetch_one`
+    used `read_bytes()`, which held a whole 300 MB raster in memory to
+    fingerprint it, while the download beside it hashed the same bytes chunk by
+    chunk. One rule for both now.
+    """
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(CHUNK_BYTES), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def why_not_a_document_on_disk(path: Path) -> str | None:
+    """`_why_not_a_document`, applied to a file that is already on disk.
+
+    Exists because "exists and is non-empty" accepts anything: a rejection page
+    written by an older run, or a stub copied in by hand, would come back
+    `ok=True` with a hash and a clean line in the manifest. The same body check
+    the download runs is the one a reused file has to pass - a file that would
+    be refused fresh is refused stale. Shared with
+    `scripts/check_offline_readiness.py`, so the checker and the fetcher cannot
+    disagree about what counts as present.
+    """
+    return _why_not_a_document(read_head(path), total_size=path.stat().st_size)
+
+
+def path_collisions(jobs: list[tuple[dict, str]]) -> dict[Path, list[str]]:
+    """Declared files that would land on the same path: {path: [ids]}.
+
+    `_target_path` names a file from the URL's last segment, so an API that
+    serves every file under a constant final segment (`.../<id>/content`) maps
+    all of them onto one name, and whichever download finishes last silently
+    wins. A test pins the shipped config, but the collision is a property of the
+    naming rule, not of one entry - so `fetch_all` refuses the colliding jobs
+    instead of racing them.
+    """
+    seen: dict[Path, list[str]] = {}
+    for entry, kind in jobs:
+        seen.setdefault(_target_path(entry["id"], entry["url"], kind), []).append(entry["id"])
+    return {path: ids for path, ids in seen.items() if len(ids) > 1}
+
+
 def expand(entry: dict) -> list[dict]:
     """One declared source into one job per file, for entries that list several.
 
@@ -482,13 +538,23 @@ def _fetch_one(
     # not "fetch this file again". A hackathon network drops often enough that
     # you will run this several times, and a half-finished run should cost you
     # only the files that are actually missing.
+    #
+    # "Here" means "here and a document". A file that fails the same body check
+    # a fresh download must pass is moved aside as `<name>.rejected` - kept, not
+    # deleted, because it is evidence of what an earlier run accepted - and the
+    # download below runs as if it had never existed.
     existing = _target_path(source_id, url, kind)
     if existing.exists() and existing.stat().st_size > 0:
-        payload = existing.read_bytes()
-        return FetchResult(
-            source_id, url, str(existing), None, len(payload),
-            hashlib.sha256(payload).hexdigest(), stamp, error=None,
-        )
+        rejection = why_not_a_document_on_disk(existing)
+        if rejection is None:
+            return FetchResult(
+                source_id, url, str(existing), None, existing.stat().st_size,
+                sha256_of(existing), stamp, error=None,
+            )
+        quarantined = existing.with_name(existing.name + ".rejected")
+        existing.replace(quarantined)
+        log.warning("%s: existing file is not a document (%s); moved to %s and "
+                    "fetching again", source_id, rejection, quarantined.name)
 
     # A per-entry derogation, for the one case the gate cannot decide: a host
     # that serves no readable robots.txt at all. The default stays strict - a
@@ -630,10 +696,28 @@ def fetch_all(sections: tuple[str, ...] = ("geodata", "policy_corpus", "context"
                 jobs.append((job, entry.get("access", "download")))
 
     results: list[FetchResult] = []
+    # Two declared files on one path are not two files on disk: whichever
+    # finishes last wins and the other prints "ok". Refused up front, as results
+    # rather than an exception, so the rest of the run proceeds and the manifest
+    # records exactly which entries sources.yaml has to rename.
+    collisions = path_collisions(jobs)
+    stamp = datetime.now(timezone.utc).isoformat()
+    for path, ids in collisions.items():
+        for entry, _kind in jobs:
+            if entry["id"] in ids:
+                # Counted rather than named: colliding jobs usually share the
+                # very id that caused the clash (`<entry>/content` seven times).
+                results.append(FetchResult(
+                    entry["id"], entry["url"], None, None, 0, None, stamp,
+                    error=f"would overwrite {len(ids) - 1} other declared file(s) at "
+                          f"{path.name}; give them distinct filenames in config/sources.yaml",
+                ))
+    colliding = {i for ids in collisions.values() for i in ids}
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
         futures = {
             pool.submit(_fetch_one, entry, kind, throttle, robots): entry["id"]
             for entry, kind in jobs
+            if entry["id"] not in colliding
         }
         for future in as_completed(futures):
             result = future.result()  # _fetch_one never raises, so this is safe

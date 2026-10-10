@@ -84,6 +84,58 @@ def test_second_run_does_not_refetch(workspace):
     assert second.ok
 
 
+def test_a_stale_rejection_page_on_disk_is_quarantined_and_refetched(workspace):
+    """"Exists and is non-empty" lets a WAF page stored by an older run come back
+    ok=True with a hash and a clean manifest line. A reused file has to pass the
+    same body check as a fresh download; one that fails is moved aside as
+    `.rejected` (kept as evidence, never deleted) and the download runs as if it
+    had never existed."""
+    target = F._target_path("src1", "https://example.org/1.tif", "download")
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"<title>Request Rejected</title>")
+    throttle, robots = F._HostThrottle(0), F._RobotsCache()
+    with patch.object(F.requests, "get", return_value=_Response()) as get:
+        result = F._fetch_one(_entry(), "download", throttle, robots)
+    assert get.call_count == 1, "the stale page must not count as the file"
+    assert result.ok and result.bytes == len(b"payload" * 400)
+    assert target.with_name(target.name + ".rejected").read_bytes().startswith(b"<title>")
+    assert target.read_bytes() == b"payload" * 400
+
+
+def test_a_reused_file_is_fingerprinted_in_chunks_not_read_whole(workspace):
+    """The reuse path held a whole raster in memory to hash it while the download
+    beside it streamed. `sha256_of` reads CHUNK_BYTES at a time; the digest has
+    to match what `read_bytes` would give, or the manifest fingerprint changes
+    between a first run and a re-run of the same file."""
+    import hashlib
+    body = bytes(range(256)) * 40
+    target = F._target_path("src1", "https://example.org/1.tif", "download")
+    target.parent.mkdir(parents=True)
+    target.write_bytes(body)
+    with patch.object(F, "CHUNK_BYTES", 1000):          # many chunks, uneven tail
+        assert F.sha256_of(target) == hashlib.sha256(body).hexdigest()
+    with patch.object(F.requests, "get") as get:
+        result = F._fetch_one(_entry(), "download", F._HostThrottle(0), F._RobotsCache())
+    get.assert_not_called()
+    assert result.ok and result.sha256 == hashlib.sha256(body).hexdigest()
+
+
+def test_colliding_declared_paths_are_refused_not_raced(workspace):
+    """Two files on one path are not two files: whichever finished last won and
+    both printed ok. `fetch_all` now refuses both as results that name each other
+    and the fix, and still fetches everything else in the same run."""
+    entry = {"id": "api_like", "url": "https://example.org/records/1/files/",
+             "access": "download", "files": ["a.csv/content", "b.zip/content", "c.csv"]}
+    with patch.object(F, "sources", return_value=[entry]):
+        with patch.object(F.requests, "get", return_value=_Response()) as get:
+            results = F.fetch_all(sections=("geodata",))
+    assert get.call_count == 1                       # only c.csv was fetched
+    assert [r.source_id for r in results if r.ok] == ["api_like/c"]
+    refused = [r for r in results if not r.ok]
+    assert len(refused) == 2 and all("sources.yaml" in r.error for r in refused)
+    assert "would overwrite 1 other" in refused[0].error
+
+
 def test_a_failure_is_returned_not_raised(workspace):
     """One dead URL must leave the other downloads intact - the behaviour you
     want the night before a deadline."""

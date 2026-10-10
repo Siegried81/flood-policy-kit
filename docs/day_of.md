@@ -17,7 +17,9 @@ regardless of what the timetable says.
       `.env` on the morning — it expires after 10 hours, so yesterday's is dead.
       No token means `RdhUnavailable`, not a silent zero.
 - [ ] The kit runs **offline**: `pytest` green with the Wi-Fi off, *and*
-      `python scripts/check_offline_readiness.py` exits 0. The two answer
+      `python scripts/check_offline_readiness.py --strict` exits 0 — `--strict`,
+      because without it a `GROQ_API_KEY` still in `.env` is only a caveat and
+      the verdict still reads "runs offline". The two answer
       different questions — the suite mocks the network away, which is exactly
       what hides a missing 300 MB raster, so only the script can tell you whether
       the files, the Risk Data Hub cache and the local model are actually on this

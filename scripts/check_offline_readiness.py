@@ -19,7 +19,17 @@ What it checks, and why each one earns its line:
 once, in `fetch._target_path`, and this script imports it instead of re-deriving
 the rule. A readiness check that computes its own paths will eventually disagree
 with the fetcher, and then it certifies a corpus that is not the one the pipeline
-reads.
+reads. Presence is judged by the fetcher's own body check too
+(`fetch.why_not_a_document_on_disk`): a WAF page stored by an older run is on
+disk and is not a document, and "non-empty" alone cannot tell the two apart.
+
+**The two caches `src.fetch` does not fill.** The EEA river-basin layer is a
+slow REST service cached by `src/basins.py`, and the Copernicus climate
+projections are downloaded by hand into `src/climate.py`'s folder. Neither is
+declared as a fetchable file, so neither showed up in the table above, and the
+README said so - but a reader of a green verdict does not read the README. They
+are WARN rather than FAIL because the map and the brief run without them; the
+shared-basin and climate layers simply fall back to "not available" on the day.
 
 **`*.part` leftovers.** `fetch._fetch_one` streams to `<name>.part` and renames
 only once the body has been accepted, so a `.part` is the signature of a
@@ -52,7 +62,15 @@ Wi-Fi. A key left in `.env` silently turns the demo back into an online demo.
 It makes no network request other than the Ollama probe, and that probe only
 runs when `OLLAMA_URL` points at this machine or at the Compose service beside
 it; any other host is reported as "not probed" rather than quietly dialled out.
-The exit code is 0 when the demo would work offline and 1 when it would not.
+
+**Three verdicts, not two.** Every FAIL blocks: the demo would not survive. A
+run with only WARNs says "runs offline, with caveats" and names them, because
+each WARN is a decision the owner has to take rather than a fact the script can
+settle - a Groq key is the right setting every day except this one. `--strict`
+is for this one: it treats every WARN as blocking, so the evening-before run
+cannot come back green with the demo still routed through the venue Wi-Fi. The
+exit code is 0 when the verdict is "runs offline" (with or without caveats, as
+the mode allows) and 1 otherwise.
 """
 
 from __future__ import annotations
@@ -69,7 +87,7 @@ from urllib.parse import urlparse
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.data_io import DATA, sources  # noqa: E402
-from src.fetch import _target_path, expand  # noqa: E402
+from src.fetch import _target_path, expand, why_not_a_document_on_disk  # noqa: E402
 from src.rdh import CACHE_DIR as RDH_CACHE_DIR  # noqa: E402
 from src.rdh import COLLECTIONS as RDH_COLLECTIONS  # noqa: E402
 
@@ -77,6 +95,16 @@ from src.rdh import COLLECTIONS as RDH_COLLECTIONS  # noqa: E402
 # here rather than imported because rag.py reads it inline in `complete()` and
 # exposes no constant to import; if that default ever moves, move this with it.
 RAG_DEFAULT_OLLAMA_MODEL = "llama3.1"
+# Where `src/basins.py` caches the EEA river-basin layer and where `src/climate.py`
+# reads the hand-downloaded CDS files, both relative to the data directory.
+# Restated rather than imported, and for a reason this script lives by: both
+# modules import geopandas, and geopandas pulls in pyproj, one of the two
+# extensions Windows Smart App Control has blocked on the development machine.
+# A readiness check that cannot start on the laptop it is meant to certify is
+# worse than one that restates two paths. `tests/test_offline_readiness.py` pins
+# these to the modules' own constants, so a move there fails the suite here.
+BASINS_CACHE_REL = Path("processed") / "basins_cache" / "wfd2016_river_basin_districts.geojson"
+CLIMATE_DIR_REL = Path("raw") / "download" / "cds_hydrology_projections"
 # The only hosts the Ollama probe is allowed to touch: this machine, or the
 # sibling container in docker-compose.yml. Anything else is a request leaving the
 # venue, which is the thing this script exists to rule out.
@@ -151,30 +179,36 @@ def check_declared_files(data_dir: Path = DATA) -> tuple[list[dict], list[Check]
     evidence: "28 of 46 present" is a number you have to trust, while a table
     with a 0 B raster in it is a number you can see.
 
-    A zero-byte file counts as missing rather than present. `fetch._fetch_one`
-    treats any non-empty file as already done, so an empty one is both useless
-    and invisible to a re-run.
+    A zero-byte file counts as missing rather than present, and so does a file
+    the fetcher's own body check refuses (a WAF page under HTTP 200, a stub):
+    `fetch._fetch_one` applies that check to a reused file and quarantines what
+    fails it, so the row says `rejected` and the fix is the same re-run.
     """
     rows: list[dict] = []
     for source_id, access, path in declared_targets(data_dir):
         size = path.stat().st_size if path.is_file() else None
-        rows.append({"id": source_id, "access": access, "path": path, "size": size})
+        rejected = why_not_a_document_on_disk(path) if size else None
+        rows.append({"id": source_id, "access": access, "path": path, "size": size,
+                     "rejected": rejected})
 
-    present = [r for r in rows if r["size"]]
+    present = [r for r in rows if r["size"] and not r["rejected"]]
     missing = [r for r in rows if r["size"] is None]
     empty = [r for r in rows if r["size"] == 0]
+    rejected = [r for r in rows if r["rejected"]]
     total = sum(r["size"] for r in present)
 
     checks = [
         Check(
             "declared files on disk",
-            "OK" if not missing and not empty else "FAIL",
+            "OK" if not (missing or empty or rejected) else "FAIL",
             f"{len(present)}/{len(rows)} present, {_human(total)}"
             + (f"; {len(missing)} missing" if missing else "")
-            + (f"; {len(empty)} empty" if empty else ""),
+            + (f"; {len(empty)} empty" if empty else "")
+            + (f"; {len(rejected)} rejected (not a document)" if rejected else ""),
             fix="run `python -m src.fetch` while there is still a network that can "
-            "hold a connection; absent: "
-            + ", ".join(r["id"] for r in (missing + empty)[:3]),
+            "hold a connection - it fetches what is missing and quarantines what "
+            "is rejected as `<name>.rejected`; absent or rejected: "
+            + ", ".join(r["id"] for r in (missing + empty + rejected)[:3]),
         )
     ]
 
@@ -379,6 +413,50 @@ def check_rdh_cache(cache_dir: Path = RDH_CACHE_DIR) -> Check:
     return Check("RDH cache", "OK", f"{len(files)} file(s): {detail}")
 
 
+def check_basins_cache(data_dir: Path = DATA) -> Check:
+    """The EEA river-basin layer is cached, so `src/basins.py` never dials out.
+
+    The service takes about five minutes over eight pages and answers HTTP 500 to
+    a page it dislikes; offline it answers nothing, and `shared_basin_exposure`
+    then raises `BasinsUnavailable`. A WARN, not a FAIL: the kit degrades to "no
+    shared-basin figure" rather than falling over, but the owner should know
+    that before the jury asks about the Meuse.
+    """
+    path = data_dir / BASINS_CACHE_REL
+    if path.is_file() and path.stat().st_size > 0:
+        return Check("basins cache", "OK", f"{path.name}, {_human(path.stat().st_size)}")
+    return Check(
+        "basins cache",
+        "WARN",
+        f"{BASINS_CACHE_REL.as_posix()} is absent - the shared-basin layer needs the network",
+        fix="run `python -c \"from src import basins; basins.load()\"` once while "
+        "online (about five minutes, ~288 MiB); the layer is optional on the day",
+    )
+
+
+def check_climate_files(data_dir: Path = DATA) -> Check:
+    """At least one CDS projection file is in the folder `src/climate.py` reads.
+
+    These are downloaded by hand through the CDS form (the form is where a
+    request's cost is checked against its cap), so no fetcher can be blamed for
+    their absence and no manifest records them. Counted, not validated: parsing
+    the filename contract lives in `climate.describe`, behind a geopandas import
+    this script avoids - see `CLIMATE_DIR_REL`.
+    """
+    folder = data_dir / CLIMATE_DIR_REL
+    files = sorted(folder.glob("*.nc")) if folder.is_dir() else []
+    if files:
+        total = sum(p.stat().st_size for p in files)
+        return Check("climate projections", "OK", f"{len(files)} .nc file(s), {_human(total)}")
+    return Check(
+        "climate projections",
+        "WARN",
+        f"no .nc file under {CLIMATE_DIR_REL.as_posix()} - the future-climate layer is empty",
+        fix="download the ensemble members through the CDS form (docs/datasets.md) "
+        "into that folder; the layer is optional on the day",
+    )
+
+
 def _ollama_tags(url: str) -> list[str]:
     """Model names a local Ollama reports. Raises if it cannot be reached.
 
@@ -479,9 +557,34 @@ def run_checks(data_dir: Path = DATA) -> tuple[list[dict], list[Check]]:
     checks.append(check_partial_downloads(data_dir))
     checks.append(check_manifest(data_dir))
     checks.append(check_rdh_cache(data_dir / "processed" / "rdh_cache"))
+    checks.append(check_basins_cache(data_dir))
+    checks.append(check_climate_files(data_dir))
     checks.append(check_ollama())
     checks.append(check_generation_key())
     return rows, checks
+
+
+def verdict(checks: list[Check], strict: bool = False) -> tuple[str, int]:
+    """The one-line answer and the exit code, from the checks.
+
+    Separate from `main` so the three states are testable without the printing:
+    BLOCKED on any FAIL; READY WITH CAVEATS on WARNs alone, which `--strict`
+    turns into BLOCKED; READY when everything is OK. Two states are not enough:
+    "runs offline" over a WARN that the generation key routes every answer
+    through the venue Wi-Fi is true of the code and false of the demo.
+    """
+    failures = [c for c in checks if c.status == "FAIL"]
+    warnings = [c for c in checks if c.status == "WARN"]
+    if failures:
+        return f"BLOCKED - {len(failures)} blocking. The demo would NOT survive without a network.", 1
+    if warnings and strict:
+        return (f"BLOCKED - {len(warnings)} caveat(s) treated as blocking under --strict: "
+                + ", ".join(c.name for c in warnings) + "."), 1
+    if warnings:
+        return (f"READY WITH CAVEATS - the demo runs offline, but {len(warnings)} "
+                "caveat(s) need a decision: " + ", ".join(c.name for c in warnings)
+                + ". Re-run with --strict the evening before."), 0
+    return "READY - the demo runs offline.", 0
 
 
 def _print_files(rows: list[dict]) -> None:
@@ -492,15 +595,23 @@ def _print_files(rows: list[dict]) -> None:
         if len(name) > ID_WIDTH:
             name = name[: ID_WIDTH - 3] + "..."
         size = "MISSING" if row["size"] is None else _human(row["size"])
-        mark = "ok  " if row["size"] else "--  "
-        print(f"{mark}{name:{ID_WIDTH}} {row['access']:9} {size:>12}")
+        good = bool(row["size"]) and not row.get("rejected")
+        mark = "ok  " if good else "--  "
+        note = f"  REJECTED: {row['rejected']}" if row.get("rejected") else ""
+        print(f"{mark}{name:{ID_WIDTH}} {row['access']:9} {size:>12}{note}")
 
 
-def main() -> int:
-    """Print the evidence, then one actionable line per problem. Non-zero on FAIL."""
+def main(argv: list[str] | None = None) -> int:
+    """Print the evidence, then one actionable line per problem, then the verdict.
+
+    `--strict` is the only flag: it is the evening-before mode in which a WARN
+    blocks too (see `verdict`).
+    """
+    args = sys.argv[1:] if argv is None else list(argv)
+    strict = "--strict" in args
     rows, checks = run_checks()
 
-    print("\nOFFLINE READINESS\n")
+    print("\nOFFLINE READINESS" + (" (strict)" if strict else "") + "\n")
     _print_files(rows)
 
     print(f"\n{'CHECK':26} {'STATUS':6} DETAIL")
@@ -513,17 +624,9 @@ def main() -> int:
         for check in problems:
             print(f"  [{check.status}] {check.name}: {check.fix}")
 
-    failures = [c for c in checks if c.status == "FAIL"]
-    verdict = (
-        "The demo would NOT survive without a network."
-        if failures
-        else "The demo runs offline."
-    )
-    print(
-        f"\n{len(checks) - len(problems)}/{len(checks)} checks clean, "
-        f"{len(failures)} blocking. {verdict}"
-    )
-    return 1 if failures else 0
+    line, code = verdict(checks, strict)
+    print(f"\n{len(checks) - len(problems)}/{len(checks)} checks clean. {line}")
+    return code
 
 
 if __name__ == "__main__":  # pragma: no cover - a script entry point

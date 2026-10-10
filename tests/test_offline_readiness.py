@@ -119,6 +119,59 @@ def test_zero_byte_file_counts_as_missing(tmp_path):
     assert "1 empty" in disk.detail
 
 
+def test_a_rejection_page_on_disk_is_not_present(tmp_path):
+    """"Non-empty" is satisfied by a WAF page. The checker applies the fetcher's
+    own body check, so the row says why and the verdict is a FAIL with the same
+    fix as a missing file."""
+    source_id, _, path = next(
+        t for t in readiness.declared_targets(tmp_path) if t[0] == "ai_act"
+    )
+    _write(path, "<title>Request Rejected</title>")
+    rows, checks = readiness.check_declared_files(tmp_path)
+    row = next(r for r in rows if r["id"] == source_id)
+    assert "WAF" in row["rejected"]
+    disk = next(c for c in checks if c.name == "declared files on disk")
+    assert disk.status == "FAIL"
+    assert "1 rejected" in disk.detail
+    assert "src.fetch" in disk.fix
+
+
+def test_the_restated_cache_paths_match_the_modules_that_own_them():
+    """The two paths are restated so this script never imports geopandas (see
+    the comment on BASINS_CACHE_REL). This is the price: a move in either module
+    has to fail here, or the checker certifies a folder nobody reads."""
+    from src import basins, climate
+
+    assert readiness.DATA / readiness.BASINS_CACHE_REL == basins.CACHE
+    assert readiness.DATA / readiness.CLIMATE_DIR_REL == climate.CLIMATE_DIR
+
+
+def test_absent_basins_cache_warns_with_the_warm_up_command(tmp_path):
+    check = readiness.check_basins_cache(tmp_path)
+    assert check.status == "WARN"
+    assert "basins.load()" in check.fix
+
+
+def test_present_basins_cache_is_ok_and_sized(tmp_path):
+    _write(tmp_path / readiness.BASINS_CACHE_REL, "{}" * 1024)
+    check = readiness.check_basins_cache(tmp_path)
+    assert check.status == "OK" and "2.0 KiB" in check.detail
+
+
+def test_climate_folder_without_nc_files_warns(tmp_path):
+    (tmp_path / readiness.CLIMATE_DIR_REL).mkdir(parents=True)
+    _write(tmp_path / readiness.CLIMATE_DIR_REL / "notes.txt")   # not a projection
+    check = readiness.check_climate_files(tmp_path)
+    assert check.status == "WARN" and "CDS form" in check.fix
+
+
+def test_climate_folder_with_nc_files_is_ok_and_counted(tmp_path):
+    for i in range(3):
+        _write(tmp_path / readiness.CLIMATE_DIR_REL / f"member_{i}.nc", "x" * 100)
+    check = readiness.check_climate_files(tmp_path)
+    assert check.status == "OK" and "3 .nc file(s)" in check.detail
+
+
 def test_path_collisions_are_reported(tmp_path):
     """`hanze_flood_impacts` declares seven URLs that all end in /content.
 
@@ -349,7 +402,57 @@ def test_run_checks_covers_every_promised_check(tmp_path, monkeypatch):
     _rows, checks = readiness.run_checks(tmp_path)
     names = {c.name for c in checks}
     assert {"declared files on disk", "interrupted downloads", "manifest",
-            "RDH cache", "Ollama", "generation provider"} <= names
+            "RDH cache", "basins cache", "climate projections", "Ollama",
+            "generation provider"} <= names
+
+
+# --- the three verdicts -----------------------------------------------------
+#
+# Two states say "runs offline" over a WARN that the Groq key routes every
+# answer through the venue Wi-Fi: true of the code, false of the demo. The third
+# state is what makes the green signal trustworthy.
+
+
+def _ok():
+    return readiness.Check("declared files on disk", "OK", "52/52 present")
+
+
+def _warn():
+    return readiness.Check("generation provider", "WARN", "GROQ_API_KEY is set", fix="unset it")
+
+
+def _fail():
+    return readiness.Check("RDH cache", "FAIL", "empty", fix="fetch it")
+
+
+def test_all_ok_is_ready_and_exits_zero():
+    line, code = readiness.verdict([_ok()])
+    assert line.startswith("READY -") and code == 0
+
+
+def test_a_warn_alone_is_ready_with_caveats_and_names_them():
+    line, code = readiness.verdict([_ok(), _warn()])
+    assert code == 0
+    assert "CAVEATS" in line and "generation provider" in line and "--strict" in line
+
+
+def test_strict_turns_a_warn_into_a_block():
+    line, code = readiness.verdict([_ok(), _warn()], strict=True)
+    assert code == 1 and line.startswith("BLOCKED") and "generation provider" in line
+
+
+def test_a_fail_blocks_whatever_the_mode():
+    for strict in (False, True):
+        line, code = readiness.verdict([_ok(), _warn(), _fail()], strict=strict)
+        assert code == 1 and "NOT survive" in line
+
+
+def test_main_reads_strict_from_its_arguments(monkeypatch, capsys):
+    monkeypatch.setattr(readiness, "run_checks", lambda: ([], [_ok(), _warn()]))
+    assert readiness.main([]) == 0
+    assert "READY WITH CAVEATS" in capsys.readouterr().out
+    assert readiness.main(["--strict"]) == 1
+    assert "(strict)" in capsys.readouterr().out
 
 
 def test_an_empty_tree_is_reported_as_not_demo_ready(tmp_path, monkeypatch):
@@ -372,4 +475,4 @@ def test_main_exits_zero_when_every_check_is_clean(monkeypatch, capsys):
     clean = [readiness.Check("declared files on disk", "OK", "46/46 present")]
     monkeypatch.setattr(readiness, "run_checks", lambda: ([], clean))
     assert readiness.main() == 0
-    assert "runs offline" in capsys.readouterr().out
+    assert "READY - the demo runs offline" in capsys.readouterr().out

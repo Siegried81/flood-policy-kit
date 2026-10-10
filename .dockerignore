@@ -31,6 +31,10 @@ web/node_modules/
 # a truncated raster in the image under a name that looks complete - the failure
 # mode the fetcher's temp-file dance exists to prevent.
 **/*.part
+# A file an earlier run stored and a later run refused as not-a-document (a WAF
+# page under HTTP 200, a stub). `src.fetch` keeps it beside the real file as
+# evidence; it is not data and must not travel in the portable image.
+**/*.rejected
 
 # Runtime output, not input: the approved brief accumulates as the demo is used,
 # and a previous session's approvals showing up in a fresh container would be

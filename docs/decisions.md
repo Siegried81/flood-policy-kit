@@ -1365,3 +1365,76 @@ small.
 No measurement changed meaning: the map is display only; every number arrives
 aggregated from the API in EPSG:3035. `npm run build` passes (there are no
 front-end tests in this repo). Confirmed on screen by the reader.
+
+## 2026-10-10 — the offline verdict could be green with the demo online, and "present" meant "non-empty"
+
+Source: the Notion audit of 10 October (21 repos, one fiche per repo plus a
+transverse one), read against the code on this branch rather than on `main`.
+Four of its findings for this kit survived the check; two did not (HANZE's
+seven `/content` URLs are already renamed in `sources.yaml` and pinned by a
+test, and the manifest "audit trail" wording was fine). What changed:
+
+**`scripts/check_offline_readiness.py` has three verdicts, not two.** It said
+"The demo runs offline" over a WARN that `GROQ_API_KEY` routes every answer
+through the venue Wi-Fi: true of the code, false of the demo. Now `READY`,
+`READY WITH CAVEATS` (WARNs named, exit 0) and `BLOCKED` (exit 1); `--strict`
+makes a caveat block, and the day-of checklist runs it that way. Two checks
+were added for the caches `src.fetch` does not fill — the EEA basins layer and
+the hand-downloaded CDS projections — both WARN, because the map and the brief
+run without them. The README said "none of the three is covered" while
+`run_checks()` already covered the RDH cache; the paragraph now says which is
+which.
+
+**A reused file has to pass the body check a fresh download passes.** The
+idempotency rule in `src/fetch.py` was "exists and is non-empty", so a 31-byte
+WAF page stored by an older run was reused with `ok=True`, a SHA-256 and a
+clean manifest line. `why_not_a_document_on_disk` applies the same markers and
+floor to the file on disk; one that fails is moved aside as `<name>.rejected`
+(kept as evidence, excluded from the portable image) and fetched again. The
+readiness table uses the same function, so the checker and the fetcher cannot
+disagree about what "present" means. The reuse path also hashed with
+`read_bytes()` — a whole 300 MB raster in memory to fingerprint it — while the
+download beside it streamed; `sha256_of` streams both.
+
+**Colliding declared paths are refused, not raced.** `path_collisions` runs in
+`fetch_all` and returns a result per colliding job naming the file and the fix,
+while the rest of the run proceeds. The config is fixed and tested; this closes
+the naming rule itself, so the next API that serves every file under
+`.../content` fails loudly on the first run.
+
+**`token_report` catches a tokenizer that cannot fetch its table.** Measured on
+a clean clone behind a proxy that refuses `openaipublic.blob.core.windows.net`:
+`import tiktoken` succeeds, `get_encoding()` raises, and 12 tests failed through
+`/api/draft` and the draft tab — the exact offline failure the kit is rehearsed
+against, invisible to every check that was green. The call moved inside the
+`try`; the unavailable shape is unchanged.
+
+**CI.** `permissions: contents: read` on the workflow, and a second job that
+builds the `app` stage, imports the native stack inside it and runs the
+readiness script expecting `BLOCKED`. The README recorded the image as "never
+built"; the image was built and run on the owner's machine the same morning
+(Docker Desktop via `docker compose up --build`).
+
+**The map legend says which sixth a class is.** Reported from the running
+app: "the scales are odd" and "the risk is not near the sea — look at Norway
+and Sweden". The second is the data, not a defect: the hazard layer models
+river flooding only (`docs/datasets.md`), so a narrow glacial valley with its
+whole population on the flood plain ranks high and a coast does not. The first
+was the legend: the classes are quantiles (sixths of the regions present), and
+a last swatch reading "10.6% to 75.5%" with nothing else reads as a danger band.
+`src/svgmap.py` now prints the rank before the interval ("6/6 · 10.6% to
+75.5%"), puts the region count per class in the swatch tooltip, and wraps the
+legend onto rows that fit the viewBox — on one 150-unit pitch the seventh and
+eighth entries ("not measured", the hatch) sat at x ≥ 912 in a 900-wide box,
+drawn and clipped. The map stops above the legend band instead of running under
+it. The React component (`web/src/components/Choropleth.jsx`) is left for the
+same change on the owner's working tree. No figure changed.
+
+**Revisit if** a reader still takes the top class for an absolute threshold —
+then print the count in the label itself rather than the tooltip; or if the
+75.5% region turns out to be a collapsed denominator (a region whose GHS-POP
+total is tiny), which the per-region table can settle and this entry does not.
+
+Not done, and for the audit's own reasons: `main` is unprotected on GitHub
+(a repository setting, not a file), and no cost, p95 or restoration drill was
+measured.
