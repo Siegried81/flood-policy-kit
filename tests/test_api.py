@@ -382,7 +382,35 @@ def test_an_unreachable_provider_is_a_502(client, monkeypatch):
     _stub_model(monkeypatch, reply=RuntimeError("connection refused"))
     response = client.post("/api/draft", json={"question": "flood risk plans?"})
     assert response.status_code == 502
-    assert "connection refused" in response.json()["detail"]
+    assert "No model reachable (RuntimeError)" in response.json()["detail"]
+
+
+def test_the_provider_error_text_is_logged_not_returned(client, monkeypatch, caplog):
+    """CodeQL py/stack-trace-exposure: the exception message was echoed in the
+    502 detail, and an SDK or HTTP error names hosts, paths and request parts.
+    The class name is enough for the client; the message goes to the log."""
+    leak = "connection refused to http://10.0.0.7:11434 reading /home/ops/.env"
+    _stub_model(monkeypatch, reply=RuntimeError(leak))
+    with caplog.at_level("WARNING", logger="api.main"):
+        response = client.post("/api/draft", json={"question": "flood risk plans?"})
+    assert response.status_code == 502
+    assert "10.0.0.7" not in response.text and "/home/ops" not in response.text
+    assert leak in caplog.text
+
+
+def test_an_unavailable_token_report_keeps_its_reason_server_side(client, monkeypatch, caplog):
+    """The reason quotes tiktoken's exception - its cache path or the URL it
+    failed to fetch. The response still says nothing was measured."""
+    _stub_model(monkeypatch)
+    secret = r"tiktoken unavailable: [Errno 13] C:\Users\ops\AppData\Local\Temp\data-gym-cache"
+    monkeypatch.setattr(api, "token_report", lambda df, name: {
+        "toon_tokens": None, "json_tokens": None, "saving_pct": None,
+        "available": False, "reason": secret})
+    with caplog.at_level("WARNING", logger="api.main"):
+        tokens = client.post("/api/draft", json={"question": "flood risk plans?"}).json()["tokens"]
+    assert tokens["available"] is False and tokens["toon_tokens"] is None
+    assert "ops" not in tokens["reason"] and "tiktoken unavailable" in tokens["reason"]
+    assert secret in caplog.text
 
 
 def test_a_real_answer_travels_with_its_verification(client, monkeypatch):
