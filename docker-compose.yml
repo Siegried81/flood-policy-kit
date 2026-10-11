@@ -6,6 +6,7 @@
 #   docker compose --profile tools run --rm test         # the full suite, geospatial included
 #   docker compose --profile portable up --build         # the self-contained demo image
 #   docker compose --profile local-llm up --build        # + a bundled Ollama
+#   docker compose --profile agent run --rm -T mcp       # MCP tools for an agent, over stdio
 #
 # Why the container exists at all: on the Windows host, rasterio, pyogrio,
 # rasterstats and tiktoken cannot load their native DLLs (an application-control
@@ -91,6 +92,14 @@ services:
       ollama:
         condition: service_healthy
         required: false
+
+  # Intent-based MCP tools (api/mcp_server.py) for an AI agent. stdio, so it is
+  # `run -T` by the MCP client rather than `up`: no port, nothing listening.
+  mcp:
+    <<: *app-common
+    profiles: ["agent"]
+    command: ["python", "-m", "api.mcp_server"]
+    stdin_open: true
 
   # The demo image: same code, data baked in, no bind mount. Carry it on a USB
   # stick (`docker save flood-policy-kit:portable | gzip > kit.tar.gz`) and it
