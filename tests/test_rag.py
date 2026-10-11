@@ -121,6 +121,28 @@ def test_html_entities_are_decoded_before_indexing(tmp_path, monkeypatch):
     rag._INDEX = None
 
 
+@pytest.mark.parametrize("script", [
+    "<script>EVIL()</script >",
+    "<SCRIPT>EVIL()</SCRIPT x=1>",
+    "<style>.EVIL{}</style	>",
+    "<script>EVIL()",
+])
+def test_script_and_style_bodies_never_reach_the_index(tmp_path, monkeypatch, script):
+    """CodeQL py/bad-tag-filter: `<script.*?</script>` missed every end tag a
+    browser accepts but the regex did not spell, and left the code as text."""
+    (tmp_path / "doc.html").write_text(
+        "<p>Flood risk management plans cover prevention, protection and "
+        f"preparedness for every river basin district.</p>{script}",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(rag, "_INDEX", None)
+    index = rag.load_index(tmp_path)
+    text = " ".join(p.text for p in index.passages)
+    assert "EVIL" not in text
+    assert "preparedness" in text
+    rag._INDEX = None
+
+
 # --- The provider layer -------------------------------------------------------
 # Every call is mocked. The whole point of these tests is the failure path, and a
 # test that needed a live provider to exercise a dead provider would be useless.

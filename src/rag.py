@@ -27,6 +27,7 @@ import re
 from collections import Counter
 from dataclasses import dataclass
 from html import unescape
+from html.parser import HTMLParser
 from pathlib import Path
 
 from src.data_io import DATA
@@ -186,14 +187,59 @@ def _read(path: Path) -> str:
         return ""
     text = path.read_text(encoding="utf-8", errors="replace")
     if suffix in {".html", ".htm"}:
-        # Crude, deliberately: a dependency-free tag strip beats adding
-        # beautifulsoup for a corpus we control and fetched ourselves.
-        text = re.sub(r"<script.*?</script>|<style.*?</style>", " ", text, flags=re.S | re.I)
-        text = re.sub(r"<[^>]+>", " ", text)
+        text = _html_text(text)
     # Entities survive the tag strip, and "guidelines&#039;" tokenises as a word
     # that matches nothing. Unescape whatever the format, since a .txt scraped
     # from the web can carry them too.
     return unescape(text)
+
+
+class _TextOnly(HTMLParser):
+    """Collect the text of an HTML page, without the bodies of <script> and <style>.
+
+    Entities are passed through untouched (`convert_charrefs=False` plus the two
+    ref handlers) so `_read` unescapes every format exactly once.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=False)
+        self.parts: list[str] = []
+        self._hidden = 0
+
+    def handle_starttag(self, tag: str, attrs: list) -> None:
+        if tag in {"script", "style"}:
+            self._hidden += 1
+        self.parts.append(" ")
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in {"script", "style"} and self._hidden:
+            self._hidden -= 1
+        self.parts.append(" ")
+
+    def handle_data(self, data: str) -> None:
+        if not self._hidden:
+            self.parts.append(data)
+
+    def handle_entityref(self, name: str) -> None:
+        if not self._hidden:
+            self.parts.append(f"&{name};")
+
+    def handle_charref(self, name: str) -> None:
+        if not self._hidden:
+            self.parts.append(f"&#{name};")
+
+
+def _html_text(html: str) -> str:
+    """Strip an HTML page to its text, still without adding a dependency.
+
+    The stdlib tokenizer rather than a regex: it ends a script the way a browser
+    does, so `</script >`, `</SCRIPT x>` and a script that is never closed are
+    all dropped, where `<script.*?</script>` left their code in the corpus text.
+    """
+    parser = _TextOnly()
+    parser.feed(html)
+    parser.close()
+    return "".join(parser.parts)
 
 
 def search(question: str, k: int = 5) -> list[dict]:

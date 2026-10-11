@@ -26,6 +26,7 @@ Run with `uvicorn api.main:app --port 8010`.
 from __future__ import annotations
 
 import json
+import logging
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -43,6 +44,7 @@ from src.toon_io import flatten, to_toon, token_report  # noqa: E402
 from src.vulnerability import sensitivity  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
+log = logging.getLogger(__name__)
 EXPOSURE = ROOT / "data" / "processed" / "exposure.parquet"
 CONTEXT = ROOT / "data" / "processed" / "context.parquet"
 GEOMETRY = ROOT / "data" / "processed" / "regions.geojson"
@@ -423,6 +425,32 @@ def search(q: str, k: int = 5) -> dict:
     return {"question": q, "passages": passages, "refused": not passages}
 
 
+def _upstream_failure(exc: Exception) -> str:
+    """The 502 detail for a model call that failed, with the exception logged here.
+
+    Only the exception's class reaches the client. Its message is written by the
+    provider SDK or the HTTP stack and can carry a URL, a local path or part of a
+    request, so it goes to the server log, where whoever runs the service reads it.
+    """
+    log.warning("model call failed", exc_info=exc)
+    return (f"No model reachable ({type(exc).__name__}). Retry, or check the "
+            "provider; the server log has the details.")
+
+
+def _public_token_report(df: pd.DataFrame) -> dict:
+    """`token_report` for an HTTP response: the unavailable reason stays server-side.
+
+    The reason quotes tiktoken's exception, which names the cache path under the
+    system temp dir or the URL it failed to fetch. The local UI shows it as is;
+    a client of the API only needs to know that nothing was measured.
+    """
+    report = token_report(df, "exposure")
+    if not report["available"]:
+        log.warning("token report unavailable: %s", report["reason"])
+        report["reason"] = "tiktoken unavailable; the server log has the details."
+    return report
+
+
 class DraftRequest(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
     rows: int = Field(default=200, ge=1, le=2000)
@@ -453,7 +481,7 @@ def draft(req: DraftRequest) -> dict:
         # 502, not 500: the failure is upstream, and the status code is the only
         # thing telling the client it is the model that is unreachable rather
         # than this service that is broken.
-        raise HTTPException(status_code=502, detail=f"No model reachable: {exc}") from exc
+        raise HTTPException(status_code=502, detail=_upstream_failure(exc)) from exc
     if text is None:
         # The provider can answer with message.content: null, which `rag.complete`
         # passes straight through. Verification below runs regexes over the text,
@@ -471,7 +499,7 @@ def draft(req: DraftRequest) -> dict:
         "passages": passages,
         "grounding": round(rag.grounding_score(text, passages), 4),
         "invalid_citations": rag.invalid_citations(text, len(passages)),
-        "tokens": token_report(df, "exposure"),
+        "tokens": _public_token_report(df),
     }
 
 
@@ -508,9 +536,7 @@ def translate_section(req: TranslateRequest) -> dict:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
         # Upstream, like `/api/draft`: the model is unreachable, not this service.
-        raise HTTPException(
-            status_code=502, detail=f"No model reachable: {exc}"
-        ) from exc
+        raise HTTPException(status_code=502, detail=_upstream_failure(exc)) from exc
     return {
         "text": result.text,
         "language": result.language,
