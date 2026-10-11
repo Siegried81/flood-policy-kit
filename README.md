@@ -105,6 +105,7 @@ flood-policy-kit/
 │   ├── build_geometry.py            # freezes data/processed/regions.geojson, the choropleth's polygons
 │   └── check_offline_readiness.py   # is this laptop demo-ready with the Wi-Fi off?
 ├── api/main.py                 # JSON API over src/, for the React UI
+├── api/mcp_server.py           # 3 intent-based MCP tools for agents, answered in flat TOON
 ├── web/                        # React + Vite UI: choropleth, sensitivity, approval gate
 ├── app/streamlit_app.py        # six tabs, no build step: the React five plus the AI log
 ├── templates/policy_brief.md   # the 2-page deliverable
@@ -130,7 +131,7 @@ of them. Windows Smart App Control then moved to enforcement on 2026-10-07 and
 refused `rasterio`'s own GDAL build, which no pin fixed; by 2026-10-08 it allowed
 the same wheel again with nothing reinstalled. **The policy moves both ways, so
 measure rather than believe either state** — measured 2026-10-08, `import
-rasterio` works and the whole suite runs on Windows: **<!-- numbers:tests_collected -->551<!-- /numbers --> passed, nothing
+rasterio` works and the whole suite runs on Windows: **<!-- numbers:tests_collected -->563<!-- /numbers --> passed, nothing
 deselected**. The WSL2 venv stays anyway, because it is the only route that does
 not depend on the policy's mood and it is where a continental raster build
 belongs. **Neither container has ever been built:** the Docker daemon is not running on this machine, so both are
@@ -163,7 +164,7 @@ rather than on the morning of the event.
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m pytest -q           # <!-- numbers:tests_collected -->551<!-- /numbers --> tests, offline: no network, no model
+.venv/bin/python -m pytest -q           # <!-- numbers:tests_collected -->563<!-- /numbers --> tests, offline: no network, no model
                                         # Measured 2026-10-08 on Windows, nothing
                                         # deselected. Smart App Control blocked
                                         # rasterio on 2026-10-07 and allowed it
@@ -185,6 +186,30 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 # Either UI. Both read the same frozen table, so they cannot disagree on a number.
 .venv/bin/streamlit run app/streamlit_app.py            # no build step
 .venv/bin/uvicorn api.main:app --port 8010              # + cd web && npm run dev
+```
+
+### Agent access (MCP)
+
+`api/mcp_server.py` exposes the kit to an AI agent (Claude Desktop, Claude Code,
+any MCP client) as **three tools shaped around a question, not around a route**:
+
+| Tool | The question it answers |
+|---|---|
+| `rank_regions(top_n, return_period, country)` | where should we look first? |
+| `profile_regions(region_ids)` | tell me about / compare these regions |
+| `find_policy_evidence(question, k)` | what does the corpus say about X? (cite or refuse) |
+
+Each does its chaining server-side and answers with a small **flattened TOON**
+table, so the agent makes one call instead of chaining `/exposure`, `/context`
+and `/search` over raw JSON. `/approve` is deliberately not a tool: a human signs
+the brief. The return period travels in a `# return_period=...` header with every
+figure.
+
+```bash
+.venv/bin/python -m api.mcp_server                      # stdio, what desktop clients launch
+claude mcp add flood-kit -- .venv/bin/python -m api.mcp_server   # register in Claude Code
+.venv/bin/python -m api.mcp_server streamable-http      # over HTTP (e.g. a Render web service)
+docker compose --profile agent run --rm -T mcp          # same, inside the container
 ```
 
 `--stripes` is memory, not meaning: the windows are disjoint, so the figures do
