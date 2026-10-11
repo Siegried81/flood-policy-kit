@@ -100,7 +100,15 @@ def token_report(df: pd.DataFrame, name: str, encoding: str = "o200k_base") -> d
     """
     try:
         import tiktoken
-    except Exception as exc:  # compiled extension blocked or not installed
+
+        # Inside the try on purpose. `get_encoding` downloads the BPE table from
+        # OpenAI's blob storage the first time it is asked for, and caches it
+        # under the system temp dir. On a fresh machine with the network
+        # unplugged - the exact situation this kit is rehearsed for - the import
+        # succeeds and THIS call raises, which would take the draft tab and
+        # `/api/draft` down with an OSError over a count nobody asked for.
+        enc = tiktoken.get_encoding(encoding)
+    except Exception as exc:  # extension blocked, not installed, or BPE table not fetchable
         return {
             "toon_tokens": None,
             "json_tokens": None,
@@ -108,7 +116,6 @@ def token_report(df: pd.DataFrame, name: str, encoding: str = "o200k_base") -> d
             "available": False,
             "reason": f"tiktoken unavailable: {exc}",
         }
-    enc = tiktoken.get_encoding(encoding)
     toon_tokens = len(enc.encode(to_toon(df, name)))
     json_tokens = len(enc.encode(df.to_json(orient="records", force_ascii=False)))
     return {

@@ -56,6 +56,12 @@ WORKDIR /app
 # Dependency layer first, so editing a Python file rebuilds only the cheap
 # layers below instead of reinstalling geopandas and friends.
 COPY requirements.txt .
+# libexpat1 is the one system library the manylinux wheels of pyogrio/GDAL
+# load at import time that python:3.12-slim does not ship. Without it the
+# image builds, and `import pyogrio` fails with `libexpat.so.1: cannot open
+# shared object file` - which is what the CI docker job measured on the
+# first run, while a build on the GDAL base image hid it.
+RUN apt-get update && apt-get install -y --no-install-recommends libexpat1 && rm -rf /var/lib/apt/lists/*
 RUN pip install -r requirements.txt
 
 # Unprivileged user. data/ is created and owned by it so a bind mount and the

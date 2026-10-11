@@ -313,9 +313,13 @@ geodata:
     caveat: >
       IDW interpolation between observed points, so it is a surface fitted to
       measurements, not a measurement everywhere - state that before quoting a
-      per-commune depth. File names were not resolved: discover them through
-      atom_service.xml -> atom_dataset.xml under this uuid.
-    verified: 2026-10-06 (record identified; file names not resolved)
+      per-commune depth. The url is a ONE-OFF download job of the Walloon
+      geoportal (spwdatadownload/results/<uuid>) and expires: a 404 here means
+      "request the download again", not "the dataset is gone". Geocatalogue
+      record: "Zones inondees IDW - Hauteur d'eau - juillet 2021" (the dataset,
+      not its WMS/REST visualisation services); download as GeoTIFF in
+      EPSG:31370, paste the new results url above and bump `verified`.
+    verified: 2026-10-06 (record identified; download link expired by 2026-10-10)
 
   - id: gisco_nuts3
     url: https://gisco-services.ec.europa.eu/distribution/v2/nuts/geojson/NUTS_RG_01M_2024_3035_LEVL_3.geojson

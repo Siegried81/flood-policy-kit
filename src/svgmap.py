@@ -93,6 +93,13 @@ def _rings(geometry: dict[str, Any]) -> list[list[Sequence[float]]]:
     return []
 
 
+#: Width of one legend entry and height of one legend row, in viewBox units.
+#: 170 fits "6/6 · 10.6% to 75.5%" at 11px with the swatch beside it; the rows
+#: wrap from there, see `choropleth_svg`.
+LEGEND_SLOT = 170
+LEGEND_ROW_H = 20
+
+
 def quantile_breaks(values: Iterable[float], classes: int = 6) -> list[float]:
     """Upper bound of each class, from the values actually present.
 
@@ -223,13 +230,26 @@ def choropleth_svg(
         )
 
     pad = 8
+    # The legend is laid out before the map is scaled, because it owns a band at
+    # the bottom of the viewport and the map has to stop above it. Entries wrap
+    # onto as many rows as the width allows: six classes plus "not measured"
+    # plus the hatch swatch is eight slots, and eight slots on one row ran past
+    # the right edge of the viewBox, so the last entries were drawn and clipped.
+    # A legend entry that exists in the DOM and not on screen is a colour with
+    # no name.
+    hatched = {c for c in hatch if _class_of(values.get(c), breaks) is not None}
+    n_entries = len(breaks) + 1 + (1 if hatched else 0)
+    per_row = max(1, (width - 2 * pad) // LEGEND_SLOT)
+    legend_rows = -(-n_entries // per_row)  # ceiling division
+    legend_h = legend_rows * LEGEND_ROW_H
     x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
     span = max(x1 - x0, 1.0), max(y1 - y0, 1.0)
-    scale = min((width - 2 * pad) / span[0], (height - 2 * pad) / span[1])
+    map_h = height - 2 * pad - legend_h
+    scale = min((width - 2 * pad) / span[0], map_h / span[1])
     # Centre the drawing in the viewport, and flip Y: SVG counts downwards while
     # a projected northing counts up.
     off_x = pad + ((width - 2 * pad) - span[0] * scale) / 2
-    off_y = pad + ((height - 2 * pad) - span[1] * scale) / 2
+    off_y = pad + (map_h - span[1] * scale) / 2
 
     def place(point: tuple[float, float]) -> str:
         return (
@@ -242,11 +262,16 @@ def choropleth_svg(
             return fmt(value)
         return f"{value * 100:.1f}%" if percent else f"{value:,.0f}"
 
-    hatched = set(hatch)
     overlays: list[str] = []
+    # How many regions each class holds, for the legend tooltips: with quantile
+    # classes the counts are near-equal by construction, and saying so is what
+    # stops "10.6% to 75.5%" reading as a danger band rather than a top sixth.
+    per_class = [0] * len(breaks)
     for code, rings in projected:
         value = values.get(code)
         index = _class_of(value, breaks)
+        if index is not None:
+            per_class[index] += 1
         fill = NO_DATA if index is None else palette[min(index, len(palette) - 1)]
         path = " ".join(
             "M" + " L".join(place(p) for p in ring) + " Z" for ring in rings
@@ -275,34 +300,38 @@ def choropleth_svg(
         )
 
     def legend_text(i: int) -> str:
-        # The first class's lower bound is the smallest value present, not zero:
-        # a signed quantity goes below it, and printing "0.0" there would state
-        # that nothing in the map falls.
+        # The rank comes first because the classes are quantiles: "6/6" says
+        # this is the top sixth of the regions present, which is the only
+        # reading under which "10.6% to 75.5%" is not a danger band. The first
+        # class's lower bound is the smallest value present, not zero: a signed
+        # quantity goes below it, and printing "0.0" there would state that
+        # nothing in the map falls.
         low = low_bound if i == 0 else breaks[i - 1]
-        return f"{show(low)} to {show(breaks[i])}"
+        return f"{i + 1}/{len(breaks)} · {show(low)} to {show(breaks[i])}"
+
+    entries: list[tuple[str, str, str]] = [  # (fill, label, tooltip)
+        (
+            palette[min(i, len(palette) - 1)],
+            legend_text(i),
+            f"class {i + 1} of {len(breaks)}: {per_class[i]:,} regions, equal-count "
+            f"(quantile) classes",
+        )
+        for i in range(len(breaks))
+    ]
+    entries.append((NO_DATA, "not measured", "no figure for the region; not a zero"))
+    if hatched:
+        entries.append(("url(#disagree)", "models disagree on the direction",
+                        "the median is drawn; the model chains differ on its sign"))
 
     swatches = []
-    for i in range(len(breaks)):
+    for n, (fill, text, tip) in enumerate(entries):
+        row, col = divmod(n, per_row)
+        y = height - legend_h + row * LEGEND_ROW_H + 2
+        x = pad + 4 + col * LEGEND_SLOT
         swatches.append(
-            f'<rect x="{12 + i * 150}" y="{height - 26}" width="14" height="14" '
-            f'fill="{palette[min(i, len(palette) - 1)]}" stroke="{STROKE}" '
-            f'stroke-width="0.4"/>'
-            f'<text x="{30 + i * 150}" y="{height - 15}" font-size="11" '
-            f'class="lg">{legend_text(i)}</text>'
-        )
-    swatches.append(
-        f'<rect x="{12 + len(breaks) * 150}" y="{height - 26}" width="14" '
-        f'height="14" fill="{NO_DATA}" stroke="{STROKE}" stroke-width="0.4"/>'
-        f'<text x="{30 + len(breaks) * 150}" y="{height - 15}" font-size="11" '
-        f'class="lg">not measured</text>'
-    )
-    if overlays:
-        swatches.append(
-            f'<rect x="{12 + (len(breaks) + 1) * 150}" y="{height - 26}" '
-            f'width="14" height="14" fill="url(#disagree)" stroke="{STROKE}" '
-            f'stroke-width="0.4"/>'
-            f'<text x="{30 + (len(breaks) + 1) * 150}" y="{height - 15}" '
-            f'font-size="11" class="lg">models disagree on the direction</text>'
+            f'<rect x="{x}" y="{y}" width="14" height="14" fill="{fill}" '
+            f'stroke="{STROKE}" stroke-width="0.4"><title>{tip}</title></rect>'
+            f'<text x="{x + 18}" y="{y + 11}" font-size="11" class="lg">{text}</text>'
         )
 
     # The legend colour is a class with a dark-mode rule rather than

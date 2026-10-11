@@ -98,6 +98,23 @@ def test_an_unavailable_tokenizer_reports_itself_instead_of_estimating():
     assert "tiktoken" in report["reason"]
 
 
+def test_a_tokenizer_that_cannot_fetch_its_table_reports_itself_too():
+    """`tiktoken.get_encoding` downloads the BPE table on first use. On a clean
+    machine with the network unplugged the import succeeds and that call raises,
+    which took `/api/draft` and the draft tab down while every offline check was
+    green - measured 2026-10-10, 12 tests failing through this one line. Same
+    unavailable shape as a blocked import, same reason key."""
+    import src.toon_io as T
+
+    df = pd.DataFrame({"commune": ["Liege"], "exposed_pop": [1]})
+    tiktoken = pytest.importorskip("tiktoken")
+    with patch.object(tiktoken, "get_encoding", side_effect=OSError("Tunnel connection failed: 403")):
+        report = T.token_report(df, "exposure")
+    assert report["available"] is False
+    assert report["toon_tokens"] is None and report["saving_pct"] is None
+    assert "403" in report["reason"]
+
+
 def test_encoding_a_table_never_needs_the_tokenizer():
     """`to_toon` is what both entry points import; it must not depend on a
     compiled extension, or neither UI can start."""
