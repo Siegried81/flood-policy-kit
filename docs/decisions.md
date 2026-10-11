@@ -1458,3 +1458,24 @@ written to catch.
 Also recorded: the `wallonia_observed_water_depth_2021` url is a one-off
 download job of the Walloon geoportal and expires; `sources.yaml` now says so
 in the entry's caveat, so the next 404 reads as "request the download again".
+
+## 2026-10-11 — the image built and did not import: libexpat1
+
+The docker job added to CI on 10 October failed on its first run, at the step it
+exists for: `docker run flood-policy-kit:ci python -c "import rasterio, pyogrio,
+rasterstats, tiktoken"` ended with `ImportError: libexpat.so.1: cannot open
+shared object file`. The `app` stage is `python:3.12-slim` plus pip wheels and
+no `apt-get`; the manylinux wheels of pyogrio/GDAL bundle GDAL but load the
+system libexpat at import, which the slim image does not ship. The entry of 10
+October recorded the image as "built and run on the owner's machine the same
+morning" — true of a build on the GDAL base image, which carries libexpat, and
+not of the default base the CI builds.
+
+**Repair.** One `apt-get install --no-install-recommends libexpat1` before the
+pip layer. Replayed locally with Docker 29.7.2 on the rebuilt image: the build
+completes, the four imports load, and the readiness script with no data says
+`BLOCKED - 4 blocking` and exits 1 — the three assertions of the CI job.
+
+Also: the test counts rewritten to 551 on 10 October sat under two sentences
+still dated 8 October; re-measured today (551 passed) and dated so.
+

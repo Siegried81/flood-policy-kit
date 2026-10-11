@@ -326,7 +326,7 @@ down in advance.
 
 ## 7. The test suite
 
-**<!-- numbers:tests_collected -->551<!-- /numbers --> tests, offline**: no network, no model, no key. Measured 8 October 2026 on
+**<!-- numbers:tests_collected -->551<!-- /numbers --> tests, offline**: no network, no model, no key. Measured 11 October 2026 on
 Windows: all <!-- numbers:tests_collected -->551<!-- /numbers --> collect and pass, nothing deselected. Do not quote that as a
 property of the platform — Smart App Control moved to enforcement on 7 October
 2026 and refused rasterio's unsigned DLLs, which left 433 collectable and 431
