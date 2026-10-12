@@ -311,7 +311,7 @@ this page adds is the current legislative context a JRC jury will know:
   its name. The unit is now in the docstring and pinned by a test; renaming
   would touch `api/main.py`, `app/streamlit_app.py`,
   `scripts/build_exposure.py`, the tests and every older export.
-- Measured 2026-10-12: the full suite is **<!-- numbers:tests_collected -->586<!-- /numbers --> tests, all passing
+- Measured 2026-10-12: the full suite is **<!-- numbers:tests_collected -->640<!-- /numbers --> tests, all passing
   in WSL2 with nothing deselected**. Smart App Control blocked `rasterio` on
   Windows on 2026-10-07, allowed it the next morning with nothing reinstalled,
   and blocked it again on 2026-10-12, so the policy moves both ways and the only safe habit is to

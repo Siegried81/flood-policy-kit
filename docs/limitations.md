@@ -206,18 +206,24 @@ written intent rather than from memory.
   `app/streamlit_app.py`, `scripts/build_exposure.py`, the tests and every older
   export; recorded as a naming decision, not a bug. Design:
   [`policy_answer.md` §10](policy_answer.md#10-open-and-known).
-- **Natural-language access to the exposure table.** Named as a role for the
-  GenAI engineer; nothing in `src/`, `api/` or `app/` implements it. Design:
-  [`roles.md`](roles.md#hat-3--genai-engineer-the-responsible-accelerator).
-- **The Docker images.** `Dockerfile` and `docker-compose.yml` are written and
-  have never been built; the daemon was not running on the development machine.
-  Design: root [`README.md`](../README.md).
+- **The `portable` Docker image.** The `app` image was built and run on
+  2026-10-12 (the geospatial stack imports in it; see the root
+  [`README.md`](../README.md)); the `portable` image, the one that carries the
+  data for the event, has not been built yet.
 - **The dress rehearsal on an unprepared region.** Scheduled for 26-28 October
   on Valencia 2024 or Emilia-Romagna 2023, precisely to find what is secretly
   hard-coded. Design: [`plan.md`](plan.md#week-4-why-the-dress-rehearsal-matters-most).
 
 **Built after the freeze.** Items that left this list, with what still bounds them.
 
+- **Natural-language access to the exposure table** (2026-10-12). One model
+  call writes a whitelisted query spec, pandas answers it, and every answer
+  names its return period and the definition of each column used. It returns
+  rows, never sums or means, and only columns defined in `src/nlquery.py`
+  `COLUMNS` are queryable; the context table is not. The model can misread a
+  question into a valid spec that answers a different one, so the spec is shown
+  with every answer. [`src/nlquery.py`](../src/nlquery.py),
+  [`decisions.md`, 2026-10-12](decisions.md#2026-10-12--the-exposure-table-answers-questions-in-plain-words-and-the-model-computes-nothing).
 - **The undeclared policy sources** (2026-10-12). Twelve of the thirteen are
   declared in `config/sources.yaml`, eleven in the retrieval corpus and the
   EIOPA input spreadsheet as `context`; the six EU acts come from the
