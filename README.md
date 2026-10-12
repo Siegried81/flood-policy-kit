@@ -153,6 +153,20 @@ tests and raster work run on Linux without the WSL venv. It leaves `app` and
 `api` untouched and runs nothing until you do; Streamlit and the API started
 from its terminal are forwarded on 8501 and 8010.
 
+**Prebuilt image.** `.github/workflows/publish.yml` builds the code-only `app`
+stage on every push to `main` (and on `v*` tags), starts it and waits for the
+Streamlit health check, then pushes it to GitHub Container Registry and, when
+the `DOCKERHUB_*` secrets are set, to Docker Hub (page text: `DOCKERHUB.md`).
+No build needed to run it:
+
+```bash
+docker pull ghcr.io/siegried81/flood-policy-kit:latest     # or siegried/flood-policy-kit on Docker Hub
+docker run --rm -p 8501:8501 -v "$PWD/data:/app/data" ghcr.io/siegried81/flood-policy-kit:latest
+```
+
+Add `--env-file .env` for an LLM key. The `portable` image (data baked in) is
+never published; build it locally.
+
 ## Docs, in reading order
 
 | Doc | Read it for |
