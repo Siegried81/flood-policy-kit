@@ -1479,3 +1479,67 @@ completes, the four imports load, and the readiness script with no data says
 Also: the test counts rewritten to 551 on 10 October sat under two sentences
 still dated 8 October; re-measured today (551 passed) and dated so.
 
+
+## 2026-10-12 — protected nature under the water: the first environmental figure
+
+**NEW COLUMNS in `context.parquet` (context, never exposure).**
+
+- `natura2000_km2` — the area of the UNION of Natura 2000 sites inside the
+  region, km2, end-2024 release (`eea_natura2000_gpkg`).
+- `natura2000_flooded_km2_rp100` — the part of it where the RP100 depth exceeds
+  0.5 m once permanent water and the JRC's spurious-depth areas are removed:
+  the same flooded definition, return period and masks as the built-up columns.
+- `natura2000_flooded_share_rp100` — the second over the first, None where the
+  region holds no protected area (0 % of nothing would rank as safest).
+- `natura2000_grid_coverage` — the share of the region's area that lies on the
+  hazard grid at all.
+
+All four are None for a region in a country with no site in the file (the
+network is EU-27): not measured, not zero.
+
+**Why defined this way.** Article 6(5) of the Floods Directive asks flood risk
+maps to show adverse consequences for the environment; the kit measured people
+and buildings only. An AREA is what the source supports: the GeoPackage gives
+boundaries, not habitat sensitivity, so the column says how much protected land
+is on flood-prone ground and nothing about harm - a floodplain forest is meant
+to flood.
+
+**Why on the hazard grid, and why that does not break the windowing rule.** A
+site is a polygon, not a count on the 1 km population grid. Rasterising it to
+1 km and weighting by each cell's wet share would assume protected and flooded
+ground are independent within a cell, which is false for exactly the riverine
+sites a flood reaches. So `src/environment.py` burns the sites and the regions
+onto the hazard raster's own 3 arc-second grid and intersects them with the wet
+mask cell by cell, with each row's true cell area from the WGS84 ellipsoid. The
+rule "windows on the population grid, never on the hazard raster" exists because
+`Resampling.average` renormalises over a window's source area; nothing is
+resampled here, each hazard cell is read in exactly one full-width row band and
+added to one region, and `tests/test_environment.py` pins the answer at six
+window sizes.
+
+**Measured** (one pass on the real data through `build_context._natura`, the
+function the full build calls, 7 min 20 s, peak 8.6 GB resident; its columns
+were joined onto a copy of the frozen table and written to the new file
+`data/processed/context.natura-12-10.parquet`, so the frozen `context.parquet`
+is untouched and its 29 columns are carried over identical, checked column by
+column): 1,159 regions measured; **769,990 km2** of Natura land in NUTS3
+polygons, of which **38,246 km2 (5.0 %)** is flooded at RP100. Largest flooded
+areas: RO225 (893 km2, 14 %), HU331 (775 km2, 58 %), HR028 (732 km2, 45 %).
+Checked against an exact vector intersection of the dissolved sites with five
+regions (BE341, DE21H, HU110, NL230, RO213): grid and vector agree within 0.3 %.
+Thirteen EU regions hold no Natura land; the five French outermost regions
+(FRY10-50) and the Azores (PT200) lie off the hazard grid; ES703 is measured on
+13 % of its area and ES705 on 92 %.
+
+**Source.** 1,360,171,008 B, SHA-256
+`fc947b015a71e87be1cec3d255ba6f0c41dc434649984476beed88e537964f42`, CC-BY-4.0,
+fetched through `src.fetch` on 2026-10-12. The file writes Greece `GR` where
+GISCO writes `EL`; the country match maps one to the other.
+
+**Not built: CORINE Land Cover.** The status layer still needs a CLMS account,
+and no land-cover figure has been designed. An anonymous CLC 2018 *accounting*
+layer exists on the EEA datashare (215 MB); taking a variant built for change
+accounting is a choice left to a human.
+
+Tests (WSL, Python 3.14, no data/): **569 passed before, 586 after** -
+seventeen in the new `tests/test_environment.py`.

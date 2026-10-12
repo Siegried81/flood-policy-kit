@@ -5,10 +5,10 @@ regardless of what the timetable says.
 
 ## Before you leave home
 
-- [ ] Rasters and policy corpus **already downloaded** onto the laptop — all 37
-      downloadable geodata files, ≈3.78 GiB (the `geodata` section's 49 jobs
-      include 12 runtime API calls that store nothing), or 52 files and ≈3.82 GiB
-      counting the policy corpus and context sections (derived from `sources.yaml` on 7 October 2026;
+- [ ] Rasters and policy corpus **already downloaded** onto the laptop — all 38
+      downloadable geodata files, ≈5.05 GiB (the `geodata` section's 50 jobs
+      include 12 runtime API calls that store nothing), or 53 files and ≈5.09 GiB
+      counting the policy corpus and context sections (derived from `sources.yaml` on 12 October 2026;
       re-derive, the config still grows). Check the count, not the folder:
       `/vsicurl/` is no fallback at European scale (35,525 tiles for the EU27+EFTA
       bbox).

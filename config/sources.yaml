@@ -424,9 +424,10 @@ geodata:
       and nothing else. A protected site in a flood zone is a consequence the
       Directive names and the kit cannot yet count.
     caveat: >
-      DECLARED, NOT YET USED. No module reads this: it is recorded here so the
-      gap against Article 6(5) is traceable rather than silent. Do not cite a
-      figure from it until something computes one.
+      The SERVICE is not read by any module: the figures come from the same
+      release downloaded whole as eea_natura2000_gpkg below, which this
+      service's own description names as its source. Kept for provenance and
+      for a live map layer.
       Verified 2026-10-07: the service answers anonymously and layer 0 holds
       23,799 Habitats Directive sites (pSCI, SCI or SAC); layer 1 is the Birds
       Directive sites (SPA) and layer 2 is both together. Choosing among the
@@ -437,6 +438,31 @@ geodata:
       the same need for `maxAllowableOffset`; see `src/apsfr.py` for the measured
       cost of getting that tolerance wrong.
     verified: 2026-10-07
+
+  - id: eea_natura2000_gpkg
+    url: https://sdi.eea.europa.eu/datashare/public.php/dav/files/sptXqwkQr5g7Bp5/eea_v_3035_100_k_natura2000_p_2024_v01_r00/Natura2000_end2024.gpkg
+    landing: https://sdi.eea.europa.eu/catalogue/srv/api/records/91357f39-7866-41ce-b447-43905c364ec8
+    access: download
+    crs: EPSG:3035
+    purpose: >
+      Natura 2000 (vector), version end 2024: the boundaries of every site
+      designated under the Habitats and Birds Directives, as one GeoPackage, the
+      release the eea_natura2000_sites service above says it serves. Downloaded
+      rather than paged out of that service because the file is the reference
+      release in EPSG:3035, one request instead of thousands, and identical on
+      every run. src/environment.py reads it for the flooded protected area per
+      NUTS3 in context.parquet.
+    caveat: >
+      1,360,171,008 B, measured 2026-10-12 from the Content-Length of the EEA
+      datashare (a Nextcloud public share; this url is its anonymous WebDAV
+      path). EU-27 only: a region in a non-EU country has no Natura figure, not a
+      zero. A site designated under both directives appears once, but two
+      different sites can overlap on the ground, so areas are measured on the
+      UNION of the polygons, never as a sum of site areas. The EEA states that
+      only the Member States' own data is authentic.
+    doi: 10.2909/91357f39-7866-41ce-b447-43905c364ec8
+    licence: CC-BY-4.0
+    verified: 2026-10-12
 
   - id: copernicus_corine_land_cover
     url: https://land.copernicus.eu/en/products/corine-land-cover

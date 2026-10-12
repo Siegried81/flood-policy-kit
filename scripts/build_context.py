@@ -1,11 +1,11 @@
 """Freeze the per-region context table: data/processed/context.parquet.
 
 One row per region, holding what `exposure.parquet` deliberately does not: the
-built-up surface in the way of the water, how much of a region drains into a
-basin it shares with another country, and how the flood discharge moves under a
-climate scenario. `src/assets.py`, `src/basins.py` and `src/climate.py` compute
-these; this script is what turns them into something both UIs and the brief can
-read.
+built-up surface in the way of the water, the protected Natura 2000 area under
+it, how much of a region drains into a basin it shares with another country, and
+how the flood discharge moves under a climate scenario. `src/assets.py`,
+`src/environment.py`, `src/basins.py` and `src/climate.py` compute these; this
+script is what turns them into something both UIs and the brief can read.
 
 **A second table, not more columns on the first.** Two reasons, and the second
 is the load-bearing one.
@@ -48,13 +48,14 @@ sys.path.insert(0, str(ROOT))
 from scripts.build_exposure import (  # noqa: E402
     DEFAULT_MIN_DEPTH_M,
     DEFAULT_STRIPES,
+    HAZARD_DIR,
     PERMANENT_WATER,
     SPURIOUS_AREAS,
     _exposure_one_period,
     boundaries,
     hazard_paths,
 )
-from src import apsfr, assets, basins, climate, demographics  # noqa: E402
+from src import apsfr, assets, basins, climate, demographics, environment  # noqa: E402
 
 OUT = ROOT / "data" / "processed" / "context.parquet"
 CLIMATE_DIR = ROOT / "data" / "raw" / "download" / "cds_hydrology_projections"
@@ -109,6 +110,28 @@ def _built(admin: gpd.GeoDataFrame, return_period: int, min_depth_m: float,
     frame[f"built_share_exposed_rp{return_period}"] = observed.divide(
         denominator.where(denominator > 0)
     ).clip(upper=1.0)
+    return frame, None
+
+
+def _natura(admin: gpd.GeoDataFrame, return_period: int, min_depth_m: float):
+    """Natura 2000 area on flood-prone ground, or a reason it is absent.
+
+    Same return period, same depth threshold and same two masks as the built-up
+    figures, so "flooded" means one thing across the table. Measured on the
+    hazard grid itself - see `src/environment.py` for why that is exact here
+    while the population figures must be windowed on the population grid.
+    """
+    periods = hazard_paths()
+    if return_period not in periods:
+        return None, f"no hazard raster for RP{return_period}; have {sorted(periods)}"
+    try:
+        frame = environment.natura_by_region(
+            periods[return_period], admin,
+            return_period=return_period, min_depth_m=min_depth_m,
+            masks=[str(HAZARD_DIR / PERMANENT_WATER), str(HAZARD_DIR / SPURIOUS_AREAS)],
+        )
+    except environment.NaturaUnavailable as exc:
+        return None, str(exc)
     return frame, None
 
 
@@ -202,6 +225,18 @@ def main() -> int:
             f"built-up: RP{args.return_period} at >= {args.min_depth_m} m, "
             f"masked like the exposure table "
             f"({PERMANENT_WATER}, {SPURIOUS_AREAS})"
+        )
+
+    natura, why = _natura(admin, args.return_period, args.min_depth_m)
+    if natura is None:
+        notes.append(f"natura 2000: SKIPPED - {why}")
+    else:
+        table = table.join(natura)
+        notes.append(
+            f"natura 2000: RP{args.return_period} at >= {args.min_depth_m} m on the "
+            f"hazard grid, masked like the exposure table; "
+            f"{int(natura['natura2000_km2'].notna().sum())} of {len(admin)} units "
+            "in a country the network covers"
         )
 
     shared, why = _basins(admin)
