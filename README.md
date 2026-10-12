@@ -130,9 +130,10 @@ Windows host. The `pyogrio`/`pyproj` caps in `requirements.txt` bought back thre
 of them. Windows Smart App Control then moved to enforcement on 2026-10-07 and
 refused `rasterio`'s own GDAL build, which no pin fixed; by 2026-10-08 it allowed
 the same wheel again with nothing reinstalled. **The policy moves both ways, so
-measure rather than believe either state** — measured 2026-10-08, `import
-rasterio` works and the whole suite runs on Windows: **<!-- numbers:tests_collected -->569<!-- /numbers --> passed, nothing
-deselected**. The WSL2 venv stays anyway, because it is the only route that does
+measure rather than believe either state** — measured 2026-10-12, it blocks
+`import rasterio` again, so the three raster test modules do not collect on
+Windows, while the WSL2 venv runs the whole suite: **<!-- numbers:tests_collected -->579<!-- /numbers --> passed, nothing
+deselected**. The WSL2 venv stays, because it is the only route that does
 not depend on the policy's mood and it is where a continental raster build
 belongs. **Neither container has ever been built:** the Docker daemon is not running on this machine, so both are
 reviewed but untested, and the first build belongs in the dress-rehearsal week
@@ -164,11 +165,11 @@ rather than on the morning of the event.
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m pytest -q           # <!-- numbers:tests_collected -->569<!-- /numbers --> tests, offline: no network, no model
-                                        # Measured 2026-10-08 on Windows, nothing
-                                        # deselected. Smart App Control blocked
-                                        # rasterio on 2026-10-07 and allowed it
-                                        # again the next morning, so re-measure
+.venv/bin/python -m pytest -q           # <!-- numbers:tests_collected -->579<!-- /numbers --> tests, offline: no network, no model
+                                        # Measured 2026-10-12 in WSL2, nothing
+                                        # deselected. Smart App Control blocks
+                                        # rasterio on Windows some days and not
+                                        # others (blocked again 2026-10-12), so re-measure
                                         # rather than trust this number — see
                                         # requirements.txt for the whole story.
                                         #   wsl -d Ubuntu

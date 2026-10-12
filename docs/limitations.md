@@ -119,10 +119,11 @@ rebuilt. The findings and recommendations themselves are in
   first is a political choice the AI was not allowed to make.
   [`src/vulnerability.py`](../src/vulnerability.py) module docstring,
   [`responsible_ai.md`](responsible_ai.md#say-what-ai-must-not-decide).
-- **Two indicators, two scales, and NUTS2 applied to NUTS3.** `poverty_rate` is
-  a Eurostat percentage (1.4 to 50.7) published at NUTS2 and applied to each
-  NUTS3 child; `share_over_65` is a fraction (0.027 to 0.372). Neither column
-  name says so. [`decisions.md`, 2026-10-08 "two indicators, two scales"](decisions.md#2026-10-08--two-indicators-two-scales-and-that-is-deliberate),
+- **Two indicators, two scales, and NUTS2 applied to NUTS3.** `poverty_rate_pct`
+  is a Eurostat percentage (1.4 to 50.7) published at NUTS2 and applied to each
+  NUTS3 child; `share_over_65` is a fraction (0.027 to 0.372). Since 2026-10-12
+  the percentage says so in its name; an export from an older build still calls
+  it `poverty_rate`. [`decisions.md`, 2026-10-08 "two indicators, two scales"](decisions.md#2026-10-08--two-indicators-two-scales-and-that-is-deliberate),
   [`scope.md`](scope.md#demographics-eurostat-not-statbel).
 - **Who is not in the data.** Undocumented residents, people in temporary
   housing and seasonal workers are absent from a residential population grid.
@@ -198,10 +199,6 @@ written intent rather than from memory.
   [`policy_context.md` §5](policy_context.md).
 - **Monetised built-up exposure.** Needs damage curves. Design:
   [`src/assets.py`](../src/assets.py) module docstring.
-- **Units in column names.** `poverty_rate_pct` would touch `api/main.py`,
-  `app/streamlit_app.py`, `scripts/build_exposure.py`, the tests and every older
-  export; recorded as a naming decision, not a bug. Design:
-  [`policy_answer.md` §10](policy_answer.md#10-open-and-known).
 - **Natural-language access to the exposure table.** Named as a role for the
   GenAI engineer; nothing in `src/`, `api/` or `app/` implements it. Design:
   [`roles.md`](roles.md#hat-3--genai-engineer-the-responsible-accelerator).
@@ -214,6 +211,17 @@ written intent rather than from memory.
 - **The dress rehearsal on an unprepared region.** Scheduled for 26-28 October
   on Valencia 2024 or Emilia-Romagna 2023, precisely to find what is secretly
   hard-coded. Design: [`plan.md`](plan.md#week-4-why-the-dress-rehearsal-matters-most).
+
+**Built after the freeze.** Items that left this list, with what still bounds them.
+
+- **Units in column names** (2026-10-12). `poverty_rate` is `poverty_rate_pct`,
+  its companions `poverty_rate_pct_year` and `poverty_rate_pct_level`; values
+  unchanged. A table frozen before the rename is read under the new names by the
+  API, Streamlit and the MCP tools, and `/api/vulnerability` still accepts
+  `poverty_rate` with a `renamed` notice, for one release. CSV exports made
+  before the rename keep the old header. `share_over_65` keeps its name:
+  "share" already says fraction.
+  [`decisions.md`, 2026-10-12](decisions.md#2026-10-12--the-poverty-rate-says-it-is-a-percentage-in-its-name).
 
 ## 3. What a Member State or the Commission would still have to do
 

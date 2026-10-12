@@ -36,6 +36,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src import rag, svgmap, translate, usage_log  # noqa: E402
 from src.toon_io import fit_rows, flatten, to_toon, token_report  # noqa: E402
+from src.demographics import with_current_names  # noqa: E402
 from src.vulnerability import sensitivity  # noqa: E402
 
 # Imported from the API rather than restated here. The vulnerability index is a
@@ -121,7 +122,9 @@ def load_geometry() -> list[dict] | None:
 # that never moved is a hit.
 @st.cache_data
 def _load_exposure(_state: float) -> pd.DataFrame:
-    return pd.read_parquet(EXPOSURE_CACHE)
+    # Current column names whichever build froze the table, exactly as the API
+    # reads it, so the two UIs cannot offer differently named indicators.
+    return with_current_names(pd.read_parquet(EXPOSURE_CACHE))
 
 
 @st.cache_data

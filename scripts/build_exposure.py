@@ -663,7 +663,7 @@ def main() -> int:
         table = table.merge(
             extra.reset_index(), on="nuts_id", how="left", validate="many_to_one"
         )
-        for column in ("share_over_65", "poverty_rate"):
+        for column in ("share_over_65", "poverty_rate_pct"):
             print(f"  {column}: {int(table[column].notna().sum())} of {len(table)} rows")
     else:
         print("indicators: SKIPPED (--no-indicators), one indicator in the table")

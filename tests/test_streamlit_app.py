@@ -1002,3 +1002,15 @@ def test_a_build_that_finishes_while_the_page_is_open_is_picked_up():
         "the absence was cached: the page still refuses a table that now exists"
     )
     assert f"{len(table):,} rows" in _texts(after)
+
+
+def test_a_table_frozen_before_the_units_rename_offers_the_current_name():
+    """Both UIs read through `with_current_names`, so they offer one list."""
+    table = _nested_table()
+    table["poverty_rate"] = [14.6, 22.0, 9.1] * 3
+    with _frozen(table):
+        app_test = AppTest.from_file(str(APP), default_timeout=60).run()
+        offered = app_test.multiselect[0].options
+
+    assert app_test.exception == [], app_test.exception
+    assert offered == ["exposed_pop", "share_over_65", "poverty_rate_pct"]

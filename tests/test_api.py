@@ -785,3 +785,44 @@ def test_the_react_app_offers_the_context_tab_next_to_the_figure_it_qualifies():
     tabs = source.split("const TABS = [", 1)[1].split("]", 1)[0]
     names = [part.strip().strip('"') for part in tabs.split(",")]
     assert names[:2] == ["Exposure", "Context"]
+
+
+# --- units in column names, and tables frozen before the rename -------------------
+
+def _with_poverty(name: str) -> pd.DataFrame:
+    table = _nested_table()
+    table[name] = [14.6, 22.0, 9.1] * 3
+    table[f"{name}_year"] = ["2024"] * 9
+    return table
+
+
+def test_a_legacy_table_offers_the_same_indicators_under_the_current_name(frozen):
+    """The rename may change a name and nothing else: same columns selected, same
+    order, the percentage now saying so."""
+    frozen(_with_poverty("poverty_rate"))
+    legacy = TestClient(app).get("/api/meta").json()["indicators"]
+    frozen(_with_poverty("poverty_rate_pct"))
+    current = TestClient(app).get("/api/meta").json()["indicators"]
+    assert legacy == current == ["exposed_pop", "share_over_65", "poverty_rate_pct"]
+
+
+@pytest.mark.parametrize("table_name", ["poverty_rate", "poverty_rate_pct"])
+@pytest.mark.parametrize("asked", ["poverty_rate", "poverty_rate_pct"])
+def test_the_ranking_is_identical_whichever_name_is_stored_or_asked(frozen, table_name, asked):
+    frozen(_with_poverty("poverty_rate_pct"))
+    reference = TestClient(app).post(
+        "/api/vulnerability", json={"indicators": ["exposed_pop", "poverty_rate_pct"]}).json()
+    frozen(_with_poverty(table_name))
+    body = TestClient(app).post(
+        "/api/vulnerability", json={"indicators": ["exposed_pop", asked]}).json()
+    assert body["rows"] == reference["rows"]
+    if asked == "poverty_rate":
+        assert body["renamed"] == {"poverty_rate": "poverty_rate_pct"}
+    else:
+        assert "renamed" not in body
+
+
+def test_exposure_rows_carry_the_current_name_for_a_legacy_table(frozen):
+    frozen(_with_poverty("poverty_rate"))
+    row = TestClient(app).get("/api/exposure").json()["rows"][0]
+    assert row["poverty_rate_pct"] == 14.6 and "poverty_rate" not in row

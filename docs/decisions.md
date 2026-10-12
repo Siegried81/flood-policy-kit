@@ -1479,3 +1479,43 @@ completes, the four imports load, and the readiness script with no data says
 Also: the test counts rewritten to 551 on 10 October sat under two sentences
 still dated 8 October; re-measured today (551 passed) and dated so.
 
+
+## 2026-10-12 — the poverty rate says it is a percentage, in its name
+
+`src/demographics.py` (`LEGACY_COLUMNS`, `with_current_names`),
+`scripts/build_exposure.py`, `api/main.py`, `app/streamlit_app.py`,
+`tests/test_demographics.py`, `tests/test_api.py`, `tests/test_streamlit_app.py`
+
+**NAME CHANGE, NOT A MEASUREMENT CHANGE.** `poverty_rate` is now
+`poverty_rate_pct`, and its companions `poverty_rate_year` and
+`poverty_rate_level` are `poverty_rate_pct_year` and `poverty_rate_pct_level`,
+following `gdp_meur` / `gdp_meur_year`. The values are the ones Eurostat
+publishes, 0 to 100, exactly as before. This closes the naming item the entry of
+2026-10-08 "two indicators, two scales" left open: a table showing 14.0 beside
+0.19 now says which one is the percentage. `share_over_65` keeps its name,
+because "share" already says fraction, as `apsfr_share` and `basin_area_share`
+do.
+
+**Backward compatibility, for one release.** A table frozen before the rename -
+the one on the dev machine today - is read under the new names by `/api/*`,
+Streamlit and the MCP tools (all three read through `with_current_names`).
+`/api/vulnerability` still accepts `poverty_rate` in `indicators`, answers under
+the new name and says so in a `renamed` field. Remove `LEGACY_COLUMNS` and the
+alias after the event. A CSV exported before today keeps the old header; nothing
+can rename that. The React UI needed no change: it reads indicator names from
+`/api/meta` and hardcodes none.
+
+**Proof that no figure moved.** 39 fixed API requests (meta, exposure at no
+period, at each of the nine periods and at an absent one, context, languages,
+24 vulnerability rankings over six indicator sets and four periods), run on a
+frozen copy of the real tables before and after: once every legacy key in the
+baseline is mapped to its new name (51,110 keys, plus the one entry in
+`/api/meta`'s `indicators`) and the 8 `renamed` notices are set aside, the two
+dumps are identical, value for value. `vulnerability_indicators` selects the
+same columns in the same order - `exposed_pop`, `share_over_65`,
+`poverty_rate_pct` - and a test pins that a legacy and a current table give the
+same list and the same ranking whichever name is asked.
+
+Tests: 569 before, 579 after (3 new in `tests/test_demographics.py`, 6 in
+`tests/test_api.py`, 1 in `tests/test_streamlit_app.py`), all passing in WSL2
+with no `data/`.
