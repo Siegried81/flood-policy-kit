@@ -1,8 +1,9 @@
 """The map/dashboard deliverable, and the place the brief gets drafted.
 
-Six tabs, in the order the two days actually run: look at the exposure, read what
-qualifies it, find who is most vulnerable, draft a section against the evidence,
-translate it, and keep the AI log as you go.
+Seven tabs, in the order the two days actually run: look at the exposure, read
+what qualifies it, find who is most vulnerable, ask the table a question in plain
+words, draft a section against the evidence, translate it, and keep the AI log as
+you go.
 
 Two decisions worth stating, because a jury may ask:
 
@@ -34,7 +35,7 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src import rag, svgmap, translate, usage_log  # noqa: E402
+from src import nlquery, rag, svgmap, translate, usage_log  # noqa: E402
 from src.toon_io import fit_rows, flatten, to_toon, token_report  # noqa: E402
 from src.vulnerability import sensitivity  # noqa: E402
 
@@ -276,8 +277,8 @@ has_exposure = "exposed_pop" in view.columns
 # depend on which period is selected.
 indicators = vulnerability_indicators(exposure)
 
-map_tab, context_tab, vuln_tab, draft_tab, translate_tab, log_tab = st.tabs(
-    ["Exposure", "What qualifies it", "Who is most vulnerable",
+map_tab, context_tab, vuln_tab, ask_tab, draft_tab, translate_tab, log_tab = st.tabs(
+    ["Exposure", "What qualifies it", "Who is most vulnerable", "Ask the table",
      "Draft a brief section", "Translation", "AI usage log"]
 )
 
@@ -714,6 +715,65 @@ with vuln_tab:
             "Only the robust rows belong in the brief as findings. Quote an "
             "indicative one and the first methodological question sinks it."
         )
+
+# --- Ask the table --------------------------------------------------------------
+with ask_tab:
+    st.subheader("Ask the exposure table in plain words")
+    st.caption(
+        "The model only turns the question into a query spec — columns, filters, "
+        "one sort key, a row limit, one return period. The spec is checked against "
+        "a whitelist and pandas answers it, so every figure below is a value of "
+        "the frozen table. Nothing the model writes is executed."
+    )
+    ask_question = st.text_input(
+        "Question about the table",
+        placeholder="Which five Belgian regions have the largest share of their people exposed?",
+        max_chars=nlquery.MAX_QUESTION_CHARS,
+    )
+    with st.expander("Or write the query spec yourself (no model needed)"):
+        ask_spec_text = st.text_area(
+            "Query spec (JSON)",
+            '{"columns": ["region", "exposed_share"], "filters": '
+            '[{"column": "country", "op": "==", "value": "BE"}], '
+            '"sort": {"column": "exposed_share", "descending": true}, "limit": 5}',
+            height=120,
+        )
+        ask_run_spec = st.button("Run this spec")
+    ask_run_question = st.button("Ask", disabled=not ask_question)
+
+    ask_answer = None
+    try:
+        if ask_run_question and ask_question:
+            # `chosen`, so a question that names no period is answered for the
+            # flood on screen rather than for whichever one the module defaults to.
+            ask_answer = nlquery.ask(ask_question, exposure, default_return_period=chosen)
+        elif ask_run_spec:
+            ask_answer = nlquery.execute(
+                exposure, nlquery.parse(ask_spec_text), default_return_period=chosen
+            )
+    except nlquery.SpecError as exc:
+        st.error(f"**Query refused.** {exc}")
+    except Exception as exc:
+        # Same wording as the draft tab: an upstream failure, not a broken page,
+        # and the spec route above still works without any model.
+        st.error(f"No model reachable: {exc}. The spec route above needs none.")
+
+    if ask_answer is not None:
+        if ask_answer.return_period is not None:
+            st.info(f"Answered for the **1-in-{ask_answer.return_period} year** scenario.")
+        for note in ask_answer.notes:
+            st.caption(note)
+        st.dataframe(pd.DataFrame(ask_answer.rows), width="stretch")
+        st.markdown("**What each column means**")
+        st.dataframe(pd.DataFrame(ask_answer.definitions), width="stretch")
+        with st.expander("The query spec that was run"):
+            st.json(ask_answer.spec)
+        if ask_answer.provider:
+            st.caption(
+                f"Spec written by {ask_answer.provider}"
+                + (f" ({ask_answer.fallback_reason})" if ask_answer.fallback_reason else "")
+                + ". Log it in the AI usage tab if it reaches the brief."
+            )
 
 # --- Draft ----------------------------------------------------------------------
 with draft_tab:

@@ -311,9 +311,9 @@ this page adds is the current legislative context a JRC jury will know:
   its name. The unit is now in the docstring and pinned by a test; renaming
   would touch `api/main.py`, `app/streamlit_app.py`,
   `scripts/build_exposure.py`, the tests and every older export.
-- Measured 2026-10-11: the full suite is **<!-- numbers:tests_collected -->569<!-- /numbers --> tests, all passing
-  on Windows with nothing deselected**. Smart App Control had blocked `rasterio`
-  since 2026-10-07 and allowed it again the next morning with nothing
-  reinstalled, so the policy moves both ways and the only safe habit is to
+- Measured 2026-10-12: the full suite is **<!-- numbers:tests_collected -->623<!-- /numbers --> tests, all passing
+  in WSL2 with nothing deselected**. Smart App Control blocked `rasterio` on
+  Windows on 2026-10-07, allowed it the next morning with nothing reinstalled,
+  and blocked it again on 2026-10-12, so the policy moves both ways and the only safe habit is to
   re-measure rather than quote this line. The WSL2 venv stays as the route that
   does not depend on it.
