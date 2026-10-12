@@ -137,21 +137,21 @@ COLUMNS: dict[str, dict[str, str]] = {
         "definition": "Reference year of share_over_65.",
         "source": "src/demographics.py",
     },
-    "poverty_rate": {
+    "poverty_rate_pct": {
         "unit": "percent 0-100",
         "definition": "At-risk-of-poverty rate, Eurostat, published at NUTS2 and "
                       "applied to every NUTS3 child. A percentage, unlike "
                       "share_over_65, which is a fraction.",
         "source": "docs/decisions.md#2026-10-08--two-indicators-two-scales-and-that-is-deliberate",
     },
-    "poverty_rate_year": {
+    "poverty_rate_pct_year": {
         "unit": "text",
-        "definition": "Reference year of poverty_rate.",
+        "definition": "Reference year of poverty_rate_pct.",
         "source": "src/demographics.py",
     },
-    "poverty_rate_level": {
+    "poverty_rate_pct_level": {
         "unit": "text",
-        "definition": "The NUTS level poverty_rate was published at.",
+        "definition": "The NUTS level poverty_rate_pct was published at.",
         "source": "src/demographics.py",
     },
 }

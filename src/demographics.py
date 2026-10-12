@@ -54,6 +54,35 @@ TIMEOUT_S = 120
 #: ready-made bucket to use instead. Checked 2026-10-07.
 AGES_65_PLUS = ("Y65-69", "Y70-74", "Y75-79", "Y80-84", "Y_GE85")
 
+#: Column names that changed, old -> current. The poverty rate is a percentage
+#: (0 to 100, as Eurostat publishes it) beside `share_over_65`, a fraction (0 to
+#: 1), and a table printing 14.0 next to 0.19 read as a mistake; the unit now
+#: sits in the name. `gdp_meur` already followed that rule, with its `_year`
+#: companion named after the value column, so the companions follow too.
+#: `share_over_65` keeps its name: "share" already says fraction, as in
+#: `apsfr_share` and `basin_area_share`.
+#:
+#: Kept so that a table frozen before the rename still loads under the current
+#: names - see `with_current_names`. Remove after one release.
+LEGACY_COLUMNS = {
+    "poverty_rate": "poverty_rate_pct",
+    "poverty_rate_year": "poverty_rate_pct_year",
+    "poverty_rate_level": "poverty_rate_pct_level",
+}
+
+
+def with_current_names(df: pd.DataFrame) -> pd.DataFrame:
+    """`df` with any legacy column renamed to its current name, values untouched.
+
+    Applied wherever a frozen table is read, so the API, the Streamlit app and
+    the MCP tools see one set of names whichever build produced the parquet. A
+    table carrying BOTH names is left alone rather than given two columns with
+    one name: that table was edited by hand and needs a human.
+    """
+    renames = {old: new for old, new in LEGACY_COLUMNS.items()
+               if old in df.columns and new not in df.columns}
+    return df.rename(columns=renames) if renames else df
+
 
 class EurostatUnavailable(RuntimeError):
     """Eurostat did not answer with data. Raised rather than returning empty.
@@ -191,11 +220,11 @@ def poverty_rate(*, use_cache: bool = True) -> pd.DataFrame:
     `ilc_li41` is NUTS2. A vulnerability index that mixes levels has to SAY so -
     the assumption that an arrondissement carries its province's poverty rate is
     defensible, and hiding it is not. So the level travels with the figure in
-    `poverty_rate_level`, as text, and the brief can print it.
+    `poverty_rate_pct_level`, as text, and the brief can print it.
 
     **The unit is a PERCENTAGE, 0 to 100, as Eurostat publishes it** - while its
     sibling indicator `share_over_65` is a fraction, 0 to 1. Measured on the real
-    data: `poverty_rate` spans 1.4 to 50.7 and `share_over_65` 0.027 to 0.372, so
+    data: `poverty_rate_pct` spans 1.4 to 50.7 and `share_over_65` 0.027 to 0.372, so
     a table printing both side by side shows 14.0 next to 0.19 for the same
     region and reads as a mistake. It is not converted here, because Eurostat's
     own figure is the percentage and a brief quoting "14%" must match the source.
@@ -214,9 +243,9 @@ def poverty_rate(*, use_cache: bool = True) -> pd.DataFrame:
     frame, year = _latest(frame)
     by_nuts2 = frame.groupby("geo")["value"].mean()
 
-    out = by_nuts2.rename("poverty_rate").to_frame()
-    out["poverty_rate_year"] = year
-    out["poverty_rate_level"] = "NUTS2, applied to its NUTS3 children"
+    out = by_nuts2.rename("poverty_rate_pct").to_frame()
+    out["poverty_rate_pct_year"] = year
+    out["poverty_rate_pct_level"] = "NUTS2, applied to its NUTS3 children"
     return out
 
 
@@ -257,6 +286,6 @@ def vulnerability_indicators(
     out = older.reindex(index)
     # NUTS3 to its NUTS2 parent: the code is the parent plus one digit.
     parents = pd.Series(index.str[:4], index=index)
-    for column in ("poverty_rate", "poverty_rate_year", "poverty_rate_level"):
+    for column in ("poverty_rate_pct", "poverty_rate_pct_year", "poverty_rate_pct_level"):
         out[column] = parents.map(poverty[column])
     return out

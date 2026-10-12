@@ -41,6 +41,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src import nlquery, rag, translate  # noqa: E402
 from src.toon_io import flatten, to_toon, token_report  # noqa: E402
+from src.demographics import LEGACY_COLUMNS, with_current_names  # noqa: E402
 from src.vulnerability import sensitivity  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -77,7 +78,7 @@ DEV_ORIGINS = ["http://localhost:5190", "http://127.0.0.1:5190"]
 #: has to be judged against this list in the same pass.
 #:
 #: Judged 2026-10-07, when the Eurostat join landed: `share_over_65` and
-#: `poverty_rate` ARE indicators and stay out of this set - they are properties
+#: `poverty_rate_pct` ARE indicators and stay out of this set - they are properties
 #: of the people, which is what the index is supposed to weigh, and they are the
 #: reason it has more than one axis at all. Their `_year` and `_level` companions
 #: are stored as TEXT rather than numbers, so they are excluded by dtype and
@@ -105,7 +106,9 @@ def _table() -> pd.DataFrame:
                    "which writes data/processed/exposure.parquet. It needs the rasters "
                    "`python -m src.fetch` downloads; data/ is not committed.",
         )
-    return pd.read_parquet(EXPOSURE)
+    # Under the current column names whichever build froze it: a table from
+    # before the units rename still says `poverty_rate`. See `LEGACY_COLUMNS`.
+    return with_current_names(pd.read_parquet(EXPOSURE))
 
 
 def _region_key(df: pd.DataFrame) -> str:
@@ -379,6 +382,13 @@ def vulnerability(req: VulnerabilityRequest) -> dict:
     """
     df = _table()
     key = _region_key(df)
+    # A client written before the units rename still sends `poverty_rate`. It is
+    # answered under the current name and told so in `renamed`, for one release,
+    # rather than refused as an unknown indicator.
+    renamed = {c: LEGACY_COLUMNS[c] for c in req.indicators if c in LEGACY_COLUMNS}
+    req = req.model_copy(update={
+        "indicators": list(dict.fromkeys(renamed.get(c, c) for c in req.indicators))
+    })
     missing = [c for c in req.indicators if c not in df.columns]
     if missing:
         raise HTTPException(status_code=400, detail=f"Unknown indicators: {missing}")
@@ -404,7 +414,7 @@ def vulnerability(req: VulnerabilityRequest) -> dict:
     )
     columns = [c for c in (key, *req.indicators, "vulnerability", "top_n_frequency", "confidence")
                if c in ranked.columns]
-    return {
+    body = {
         "key": key,
         "return_period": period,
         "defaulted_return_period": defaulted,
@@ -412,6 +422,9 @@ def vulnerability(req: VulnerabilityRequest) -> dict:
         "robust": int((ranked["confidence"] == "robust").sum()),
         "total": len(ranked),
     }
+    if renamed:
+        body["renamed"] = renamed
+    return body
 
 
 @app.get("/api/search")

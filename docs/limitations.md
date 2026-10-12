@@ -119,10 +119,11 @@ rebuilt. The findings and recommendations themselves are in
   first is a political choice the AI was not allowed to make.
   [`src/vulnerability.py`](../src/vulnerability.py) module docstring,
   [`responsible_ai.md`](responsible_ai.md#say-what-ai-must-not-decide).
-- **Two indicators, two scales, and NUTS2 applied to NUTS3.** `poverty_rate` is
-  a Eurostat percentage (1.4 to 50.7) published at NUTS2 and applied to each
-  NUTS3 child; `share_over_65` is a fraction (0.027 to 0.372). Neither column
-  name says so. [`decisions.md`, 2026-10-08 "two indicators, two scales"](decisions.md#2026-10-08--two-indicators-two-scales-and-that-is-deliberate),
+- **Two indicators, two scales, and NUTS2 applied to NUTS3.** `poverty_rate_pct`
+  is a Eurostat percentage (1.4 to 50.7) published at NUTS2 and applied to each
+  NUTS3 child; `share_over_65` is a fraction (0.027 to 0.372). Since 2026-10-12
+  the percentage says so in its name; an export from an older build still calls
+  it `poverty_rate`. [`decisions.md`, 2026-10-08 "two indicators, two scales"](decisions.md#2026-10-08--two-indicators-two-scales-and-that-is-deliberate),
   [`scope.md`](scope.md#demographics-eurostat-not-statbel).
 - **Who is not in the data.** Undocumented residents, people in temporary
   housing and seasonal workers are absent from a residential population grid.
@@ -163,9 +164,13 @@ rebuilt. The findings and recommendations themselves are in
   which would otherwise grow 6.5-fold in area; the caption names them.
   [`src/svgmap.py`](../src/svgmap.py) `OUTERMOST`,
   [`decisions.md`, 2026-10-08 "there was no map"](decisions.md#2026-10-08--the-first-scored-deliverable-was-missing-there-was-no-map).
-- **The retrieval layer cites only what it holds.** Diffed on 6 October 2026,
-  at least thirteen documents cited in `policy_context.md` are declared nowhere
-  in `config/sources.yaml` and are therefore unciteable by the kit itself. A draft is passed only above a 0.7 lexical grounding score and
+- **The retrieval layer cites only what it holds.** Of the thirteen documents
+  `policy_context.md` cited without a declaration on 6 October 2026, twelve are
+  declared since 12 October and enter the index only once `python -m src.fetch`
+  has run. Still unciteable by the kit: the Belgian Insurance Act of 4 April
+  2014 (its official ELI is disallowed by the host's robots.txt), the SWD(2025)
+  assessments other than Spain's, and the full EUCRA report (its landing page
+  only). A draft is passed only above a 0.7 lexical grounding score and
   then only to a human. [`policy_context.md`](policy_context.md),
   [`workflow.md`](workflow.md#the-four-guards-and-what-each-prevents).
 
@@ -198,16 +203,10 @@ written intent rather than from memory.
   [`policy_context.md` §5](policy_context.md).
 - **Monetised built-up exposure.** Needs damage curves. Design:
   [`src/assets.py`](../src/assets.py) module docstring.
-- **Units in column names.** `poverty_rate_pct` would touch `api/main.py`,
-  `app/streamlit_app.py`, `scripts/build_exposure.py`, the tests and every older
-  export; recorded as a naming decision, not a bug. Design:
-  [`policy_answer.md` §10](policy_answer.md#10-open-and-known).
-- **The thirteen undeclared policy sources.** Listed by name so they can be
-  added to `config/sources.yaml` and fetched. Design:
-  [`policy_context.md`](policy_context.md).
-- **The Docker images.** `Dockerfile` and `docker-compose.yml` are written and
-  have never been built; the daemon was not running on the development machine.
-  Design: root [`README.md`](../README.md).
+- **The `portable` Docker image.** The `app` image was built and run on
+  2026-10-12 (the geospatial stack imports in it; see the root
+  [`README.md`](../README.md)); the `portable` image, the one that carries the
+  data for the event, has not been built yet.
 - **The dress rehearsal on an unprepared region.** Scheduled for 26-28 October
   on Valencia 2024 or Emilia-Romagna 2023, precisely to find what is secretly
   hard-coded. Design: [`plan.md`](plan.md#week-4-why-the-dress-rehearsal-matters-most).
@@ -222,6 +221,22 @@ written intent rather than from memory.
   question into a valid spec that answers a different one, so the spec is shown
   with every answer. [`src/nlquery.py`](../src/nlquery.py),
   [`decisions.md`, 2026-10-12](decisions.md#2026-10-12--the-exposure-table-answers-questions-in-plain-words-and-the-model-computes-nothing).
+- **The undeclared policy sources** (2026-10-12). Twelve of the thirteen are
+  declared in `config/sources.yaml`, eleven in the retrieval corpus and the
+  EIOPA input spreadsheet as `context`; the six EU acts come from the
+  Publications Office's CELLAR because eur-lex answers every script with a WAF
+  challenge. Not declared: the Belgian Insurance Act (robots.txt disallows its
+  ELI), the SWD(2025) series beyond Spain's (CELEX numbers never recorded); the
+  EUCRA entry is its landing page, not the report.
+  [`decisions.md`, 2026-10-12](decisions.md#2026-10-12--twelve-of-the-thirteen-cited-policy-sources-are-declared-and-one-declared-pdf-was-never-indexed).
+- **Units in column names** (2026-10-12). `poverty_rate` is `poverty_rate_pct`,
+  its companions `poverty_rate_pct_year` and `poverty_rate_pct_level`; values
+  unchanged. A table frozen before the rename is read under the new names by the
+  API, Streamlit and the MCP tools, and `/api/vulnerability` still accepts
+  `poverty_rate` with a `renamed` notice, for one release. CSV exports made
+  before the rename keep the old header. `share_over_65` keeps its name:
+  "share" already says fraction.
+  [`decisions.md`, 2026-10-12](decisions.md#2026-10-12--the-poverty-rate-says-it-is-a-percentage-in-its-name).
 
 ## 3. What a Member State or the Commission would still have to do
 
@@ -285,7 +300,10 @@ Only what the repository shows.
   pulled, so a container started without `.env` asks for the same name. The
   check skips every `access: api` source, so the Risk Data Hub is covered only
   through its cache check, and the basin districts and the CDS files through
-  their own WARN checks.
+  their own WARN checks. Since 2026-10-12, 64 files are declared: the twelve
+  policy documents added that day are missing until the next fetch, and the
+  arXiv paper is now expected as `nist_robust_ai_alignment_limits.pdf`, so the
+  check stays BLOCKED until `python -m src.fetch` has run once more.
   [`scripts/check_offline_readiness.py`](../scripts/check_offline_readiness.py),
   root [`README.md`](../README.md).
 - **Dead configuration keys.** `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` and

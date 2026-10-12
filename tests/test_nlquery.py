@@ -34,8 +34,8 @@ def _table() -> pd.DataFrame:
         "return_period": [10] * 4 + [100] * 4,
         "annual_probability": [0.1] * 4 + [0.01] * 4,
         "share_over_65": [0.18, 0.20, 0.19, 0.21] * 2,
-        "poverty_rate": [10.0, 22.0, 14.0, 9.0] * 2,
-        "poverty_rate_year": ["2024"] * 8,
+        "poverty_rate_pct": [10.0, 22.0, 14.0, 9.0] * 2,
+        "poverty_rate_pct_year": ["2024"] * 8,
     })
 
 
@@ -127,7 +127,7 @@ def test_not_equal_does_not_match_an_unmeasured_region():
     ("<=", 10.0, {"BE31", "DE11"}),
 ])
 def test_each_operator(op, value, expected):
-    column = {"in": "country", "not_in": "country", "contains": "region"}.get(op, "poverty_rate")
+    column = {"in": "country", "not_in": "country", "contains": "region"}.get(op, "poverty_rate_pct")
     answer = nlquery.execute(_table(), _spec(filters=[{"column": column, "op": op, "value": value}]))
     assert {r["nuts_id"] for r in answer.rows} == expected
 
@@ -147,11 +147,11 @@ def test_the_limit_is_applied_and_reported():
 def test_every_column_touched_carries_its_definition():
     answer = nlquery.execute(_table(), _spec(
         columns=["region"],
-        filters=[{"column": "poverty_rate", "op": ">", "value": 12}],
+        filters=[{"column": "poverty_rate_pct", "op": ">", "value": 12}],
         sort={"column": "share_over_65", "descending": False}))
     defined = {d["column"]: d for d in answer.definitions}
-    assert set(defined) == {"nuts_id", "region", "poverty_rate", "share_over_65"}
-    assert defined["poverty_rate"]["unit"] == "percent 0-100"
+    assert set(defined) == {"nuts_id", "region", "poverty_rate_pct", "share_over_65"}
+    assert defined["poverty_rate_pct"]["unit"] == "percent 0-100"
     assert defined["share_over_65"]["unit"] == "fraction 0-1"
     assert all(d["definition"] and d["source"] for d in answer.definitions)
 
@@ -229,7 +229,7 @@ def test_ask_makes_one_call_with_the_fixed_prompt_and_the_catalogue(monkeypatch)
     assert system == nlquery.SYSTEM_PROMPT
     assert "QUESTION: Where are most people exposed?" in prompt
     assert "[10, 100]" in prompt
-    assert "poverty_rate (number, percent 0-100)" in prompt
+    assert "poverty_rate_pct (number, percent 0-100)" in prompt
     assert answer.provider == "groq"
 
 

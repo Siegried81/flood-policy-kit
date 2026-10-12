@@ -206,16 +206,16 @@ def test_the_poverty_rate_says_it_is_a_nuts2_figure(monkeypatch):
     monkeypatch.setattr(demographics, "fetch", lambda dataset, **k: cubes[dataset])
 
     out = demographics.vulnerability_indicators(["BE332", "BE213", "FR101"])
-    assert out.loc["BE332", "poverty_rate"] == pytest.approx(14.6)
-    assert out.loc["BE213", "poverty_rate"] == pytest.approx(7.2)
-    assert "NUTS2" in out.loc["BE332", "poverty_rate_level"]
+    assert out.loc["BE332", "poverty_rate_pct"] == pytest.approx(14.6)
+    assert out.loc["BE213", "poverty_rate_pct"] == pytest.approx(7.2)
+    assert "NUTS2" in out.loc["BE332", "poverty_rate_pct_level"]
     # A region Eurostat does not publish stays missing rather than inheriting
     # someone else's rate.
-    assert pd.isna(out.loc["FR101", "poverty_rate"])
+    assert pd.isna(out.loc["FR101", "poverty_rate_pct"])
 
 
 def test_the_two_indicators_keep_their_published_units(monkeypatch):
-    """`poverty_rate` is a percentage and `share_over_65` a fraction, on purpose.
+    """`poverty_rate_pct` is a percentage and `share_over_65` a fraction, on purpose.
 
     Eurostat publishes the at-risk-of-poverty rate as 14.6, not 0.146, and a
     brief quoting "14.6%" has to match the source. The age share is computed here
@@ -237,7 +237,7 @@ def test_the_two_indicators_keep_their_published_units(monkeypatch):
     monkeypatch.setattr(demographics, "fetch", lambda dataset, **k: cubes[dataset])
 
     out = demographics.vulnerability_indicators(["BE332"])
-    assert out.loc["BE332", "poverty_rate"] == pytest.approx(14.6), (
+    assert out.loc["BE332", "poverty_rate_pct"] == pytest.approx(14.6), (
         "a percentage, as Eurostat publishes it"
     )
     assert out.loc["BE332", "share_over_65"] == pytest.approx(0.20), (
@@ -294,3 +294,35 @@ def test_a_cached_answer_is_reused_without_a_request(monkeypatch, tmp_path):
 
     monkeypatch.setattr(demographics, "requests", _Boom())
     assert demographics.fetch("demo_r_pjangrp3") == cube
+
+
+# --- the unit in the name, and the tables frozen before it -------------------------
+
+def test_the_percentage_carries_its_unit_in_its_name(monkeypatch):
+    """`poverty_rate_pct`, with its companions named after it as `gdp_meur_year`
+    is; the old names are gone from a fresh build."""
+    poverty = _cube(ids=["geo", "time"], sizes=[1, 1],
+                    categories=[["BE33"], ["2025"]], values={"0": 14.6})
+    ages = _age_cube({"TOTAL": 100.0, "Y65-69": 10.0, "Y70-74": 5.0,
+                      "Y75-79": 3.0, "Y80-84": 1.0, "Y_GE85": 1.0})
+    cubes = {"demo_r_pjangrp3": ages, "ilc_li41": poverty}
+    monkeypatch.setattr(demographics, "fetch", lambda dataset, **k: cubes[dataset])
+    out = demographics.vulnerability_indicators(["BE332"])
+    assert {"poverty_rate_pct", "poverty_rate_pct_year", "poverty_rate_pct_level"} <= set(out.columns)
+    assert not set(demographics.LEGACY_COLUMNS) & set(out.columns)
+
+
+def test_a_table_frozen_before_the_rename_loads_under_the_current_names():
+    old = pd.DataFrame({"nuts_id": ["BE332"], "poverty_rate": [14.6],
+                        "poverty_rate_year": ["2025"], "poverty_rate_level": ["NUTS2"]})
+    new = demographics.with_current_names(old)
+    assert list(new.columns) == ["nuts_id", "poverty_rate_pct", "poverty_rate_pct_year",
+                                 "poverty_rate_pct_level"]
+    assert new["poverty_rate_pct"].tolist() == [14.6]  # renamed, never rescaled
+    current = demographics.with_current_names(new)
+    assert current is new, "a current table passes through untouched"
+
+
+def test_a_table_with_both_names_is_left_for_a_human():
+    both = pd.DataFrame({"poverty_rate": [14.6], "poverty_rate_pct": [14.6]})
+    assert list(demographics.with_current_names(both).columns) == ["poverty_rate", "poverty_rate_pct"]
