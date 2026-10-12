@@ -28,7 +28,7 @@ time, so nothing to adjust.
 
 | Week | Goal | Done when |
 |---|---|---|
-| **Mon 5 → Sun 11** | Register. Learn the domain: Floods Directive, Sendai, Hazard×Exposure×Vulnerability. Download every dataset — **64 files, ≈3.82 GiB**. Get `geopandas`/`rasterio` under your fingers. | You can produce one map of exposed population on the Vesdre valley, 2021 |
+| **Mon 5 → Sun 11** | Register. Learn the domain: Floods Directive, Sendai, Hazard×Exposure×Vulnerability. Download every dataset — **65 files, ≈5.09 GiB**. Get `geopandas`/`rasterio` under your fingers. | You can produce one map of exposed population on the Vesdre valley, 2021 |
 | **Mon 12 → Sun 18** | The kit: exposure pipeline, vulnerability index, Streamlit map, tests, CI. | `pytest` green, `streamlit run` shows a real map |
 | **Mon 19 → Sun 25** | GenAI layer: grounded RAG over the policy corpus, brief template, responsible-AI checklist, deploy. **All downloads finished.** | App online, brief template filled with a dry-run result |
 | **Mon 26 → Wed 28** | **Full dress rehearsal**: an 8-hour solo hackathon on a *different* region (Valencia DANA 2024, or Emilia-Romagna 2023). Rehearse the pitch. Rest Wednesday evening. | A timed 3-minute pitch you can deliver without notes |
@@ -50,9 +50,9 @@ one PNG showing population exposed to a 100-year flood in the Vesdre valley,
 produced by `src/exposure.py`, with the number written on it. The valley is the
 rehearsal, not the answer — the deliverable is European, at NUTS3.
 
-**The download, measured.** `python -m src.fetch` is 64 files and ≈3.82 GiB — 37
+**The download, measured.** `python -m src.fetch` is 65 files and ≈5.09 GiB — 38
 geodata downloads, 24 policy-corpus scrapes and 3 context scrapes, the `geodata`
-section's other 12 jobs being runtime API calls that store nothing: the
+section's other 14 jobs being runtime API calls that store nothing: the
 nine return periods alone are 2.61 GiB, and four entries expand to several files
 each, so the printed count is files rather than declared sources. Start it once
 and leave it; it is idempotent, so a dropped connection costs only the files that

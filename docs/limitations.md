@@ -125,15 +125,6 @@ rebuilt. The findings and recommendations themselves are in
   the percentage says so in its name; an export from an older build still calls
   it `poverty_rate`. [`decisions.md`, 2026-10-08 "two indicators, two scales"](decisions.md#2026-10-08--two-indicators-two-scales-and-that-is-deliberate),
   [`scope.md`](scope.md#demographics-eurostat-not-statbel).
-- **Density and household income are context, and one of them is NUTS2.**
-  `pop_density_per_km2` (`demo_r_d3dens`, 2024) and
-  `household_income_pps_per_hab` (`nama_10r_2hhinc`, net disposable income in
-  PPS per inhabitant, 2023) sit in `context.parquet`, outside the index; adding
-  either to it is a weighting decision. Income is NUTS2 applied to its NUTS3
-  children and covers the EU-27 only (1,165 of 1,345 regions); density is
-  published on NUTS 2021 codes and leaves 66 NUTS 2024 regions blank.
-  [`src/demographics.py`](../src/demographics.py) `context_indicators`,
-  [`decisions.md`, 2026-10-12](decisions.md#2026-10-12--density-and-household-income-reach-the-context-table-and-gdp-reads-a-year-that-covers-the-map).
 - **Who is not in the data.** Undocumented residents, people in temporary
   housing and seasonal workers are absent from a residential population grid.
   The gap is stated, not estimated. [`strategy.md`](strategy.md#the-question-most-teams-will-not-ask),
@@ -157,9 +148,6 @@ rebuilt. The findings and recommendations themselves are in
 - **Reported events are a probe, never evidence.** News coverage is biased by
   attention, language and population; nothing from `src/events.py` enters a
   ranking or a headline. [`src/events.py`](../src/events.py) module docstring.
-- **Environment and cultural heritage are not measured.** Article 6(5) asks
-  flood risk maps to show both; the kit measures residents and built-up surface
-  only. [`datasets.md`](datasets.md#declared-and-not-yet-used-natura-2000-corine-land-cover).
 
 **The map and the text**
 
@@ -188,10 +176,10 @@ rebuilt. The findings and recommendations themselves are in
 Each item names where its design lives, so that finishing it starts from a
 written intent rather than from memory.
 
-- **Environment and heritage layers.** Natura 2000 and CORINE Land Cover are
-  declared in `config/sources.yaml` with `DECLARED, NOT YET USED` in their
-  caveat; no module reads either, and no figure may be quoted from them until
-  one does. Design: [`datasets.md`](datasets.md#declared-and-not-yet-used-natura-2000-corine-land-cover).
+- **Land cover and cultural heritage.** Natura 2000 is built (below); CORINE
+  Land Cover is declared with `DECLARED, NOT YET USED` in its caveat, needs a
+  CLMS account for the status layer, and has no figure designed yet; no heritage
+  source is declared at all. Design: [`datasets.md`](datasets.md#environment-natura-2000-measured-corine-land-cover-not-yet).
 - **The full CDS ensemble.** Two of the eight offered simulations are on disk;
   `scripts/fetch_cds_member.py` fetches one member at a time and verifies the
   filename against the request. Design: [`datasets.md`](datasets.md#copernicus-cds--hydrology-projections--verified--and-unsupported),
@@ -243,6 +231,30 @@ written intent rather than from memory.
   before the rename keep the old header. `share_over_65` keeps its name:
   "share" already says fraction.
   [`decisions.md`, 2026-10-12](decisions.md#2026-10-12--the-poverty-rate-says-it-is-a-percentage-in-its-name).
+- **Population density and household income** (2026-10-12). Context, and one
+  of them is NUTS2.
+  `pop_density_per_km2` (`demo_r_d3dens`, 2024) and
+  `household_income_pps_per_hab` (`nama_10r_2hhinc`, net disposable income in
+  PPS per inhabitant, 2023) sit in `context.parquet`, outside the index; adding
+  either to it is a weighting decision. Income is NUTS2 applied to its NUTS3
+  children and covers the EU-27 only (1,165 of 1,345 regions); density is
+  published on NUTS 2021 codes and leaves 66 NUTS 2024 regions blank.
+  [`src/demographics.py`](../src/demographics.py) `context_indicators`.
+  `gdp_meur` is read from the newest substantially published year since the
+  same day (2023, 1,292 regions).
+  [`decisions.md`, 2026-10-12](decisions.md#2026-10-12--density-and-household-income-reach-the-context-table-and-gdp-reads-a-year-that-covers-the-map).
+- **Natura 2000 on flood-prone ground** (2026-10-12). Measured as area, and
+  only in the EU-27. Article 6(5) asks flood risk maps to show the consequences for the environment and for
+  cultural heritage. Since 2026-10-12 `context.parquet` carries the Natura 2000
+  area on flood-prone ground (RP100, >= 0.5 m, masked like the exposure table):
+  38,246 km2 of 769,990 km2 of Natura land, 5.0 %. It is an area, not a harm -
+  a floodplain forest is meant to flood - and it says nothing about which
+  habitat. Regions outside the EU-27 have no figure, five French outermost
+  regions and the Azores lie off the hazard grid, and the Canaries' ES703 is
+  measured on 13 % of its area (`natura2000_grid_coverage`). Land cover
+  (CORINE) and cultural heritage are still not measured (§2).
+  [`src/environment.py`](../src/environment.py),
+  [`datasets.md`](datasets.md#environment-natura-2000-measured-corine-land-cover-not-yet).
 
 ## 3. What a Member State or the Commission would still have to do
 
@@ -293,7 +305,7 @@ here, still needs the following from the authority itself.
 Only what the repository shows.
 
 - **The data is not committed.** `data/` is ignored; a fresh clone has to fetch
-  about 3.8 GiB and run a multi-hour continental build before the API answers
+  about 5.1 GiB and run a multi-hour continental build before the API answers
   anything but 404. CI therefore runs with no data, and a test that strays
   outside the frozen harness passes locally and fails on the runner.
   [`.gitignore`](../.gitignore), [`scope.md`](scope.md#what-the-nuts3-choice-produces-on-disk),
@@ -306,7 +318,7 @@ Only what the repository shows.
   pulled, so a container started without `.env` asks for the same name. The
   check skips every `access: api` source, so the Risk Data Hub is covered only
   through its cache check, and the basin districts and the CDS files through
-  their own WARN checks. Since 2026-10-12, 64 files are declared: the twelve
+  their own WARN checks. Since 2026-10-12, 65 files are declared: the twelve
   policy documents added that day are missing until the next fetch, and the
   arXiv paper is now expected as `nist_robust_ai_alignment_limits.pdf`, so the
   check stays BLOCKED until `python -m src.fetch` has run once more.

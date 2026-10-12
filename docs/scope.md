@@ -113,10 +113,10 @@ which is open and needs no credentials.
 
 The JRC maps already cover Europe — that is what they are. Nine return periods,
 272–350 MB each, measured 2026-10-06. Downloading all nine is **2.61 GiB**, and
-the whole `geodata` section — 27 entries, 49 jobs once the multi-file ones are
-expanded, 37 of them files to download and 12 of them runtime API calls — is
-**≈3.78 GiB**, and the full fetch including the policy corpus (24) and context (3)
-is **64 files** and **≈3.82 GiB**: one evening before the 25th, and
+the whole `geodata` section — 30 entries, 52 jobs once the multi-file ones are
+expanded, 38 of them files to download and 14 of them runtime API calls — is
+**≈5.05 GiB**, and the full fetch including the policy corpus (24) and context (3)
+is **65 files** and **≈5.09 GiB**: one evening before the 25th, and
 nothing on the day. The counts come from `src.fetch.expand()` over
 `sources.yaml` as it stood on 12 October 2026, the bytes from the hosts'
 `Content-Length` on 6 October (the documents added on the 12th mostly send

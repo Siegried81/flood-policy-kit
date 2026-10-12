@@ -25,11 +25,11 @@ YAML, the YAML is right.
 
 ## What the whole download costs
 
-The `geodata` section declares **27 entries**, which expand to **49 jobs**; **37**
-of those are files to download (**≈3.78 GiB**) and the other **12** are
+The `geodata` section declares **30 entries**, which expand to **52 jobs**; **38**
+of those are files to download (**≈5.05 GiB**, of which the Natura 2000 GeoPackage is 1.27) and the other **14** are
 `access: api` endpoints queried at runtime, so nothing lands on disk for them.
 With the `policy_corpus` (**24** entries) and `context` (**3**) sections, every one
-of them a `scrape`, the whole fetch is **64 files** and **≈3.82 GiB**, a floor: the
+of them a `scrape`, the whole fetch is **65 files** and **≈5.09 GiB**, a floor: the
 twelve policy documents declared on 2026-10-12 are not in the byte total, because
 most of their hosts send no `Content-Length`. **Four** entries resolve to several files
 each — `jrc_flood_hazard` 13 (nine return periods, two companion masks, the README
@@ -632,26 +632,40 @@ moved.
 Like the WFD layer, it must be fetched once **before** the event: nothing in
 `src.fetch` or the offline readiness check knows about it.
 
-## Declared and not yet used: Natura 2000, CORINE Land Cover
+## Environment: Natura 2000 measured, CORINE Land Cover not yet
 
 Article 6(5) of the Floods Directive asks flood risk maps to show the potential
-adverse consequences for the **environment** and for **cultural heritage**. This
-kit measures residents and built-up surface and nothing else. Two sources are
-declared in `config/sources.yaml` so that gap is traceable rather than silent, and
-both carry `DECLARED, NOT YET USED` in their caveat. **No figure may be quoted
-from either until something computes one.**
+adverse consequences for the **environment** and for **cultural heritage**.
+Since 2026-10-12 the kit measures one environmental figure; cultural heritage is
+still not measured, and no heritage source is declared.
 
-- **Natura 2000** — `ProtectedSites/Natura2000Sites` on the EEA bio host, verified
-  2026-10-07: anonymous, layer 0 holds 23,799 Habitats Directive sites, layer 1
-  the Birds Directive sites, layer 2 both. Choosing among the three is a decision,
-  not a detail: a site can be designated under both directives, so layers 0 and 1
-  overlap and summing them double-counts. Web Mercator again.
+- **Natura 2000** ✅ — `eea_natura2000_gpkg`, the end-2024 release as one
+  GeoPackage (1,360,171,008 B, SHA-256 `fc947b01…964f42`, EPSG:3035, CC-BY-4.0,
+  DOI 10.2909/91357f39-7866-41ce-b447-43905c364ec8), from the EEA datashare's
+  anonymous WebDAV path. Its one spatial layer, `NaturaSite_polygon`, holds
+  27,173 sites: 21,539 type B (Habitats), 3,374 type A (Birds), 2,260 type C
+  (both), so each site appears once - the MapServer's layers 0 and 1 overlap by
+  those 2,260, which is why the service is not summed. Two different sites can
+  still overlap on the ground; `src/environment.py` burns every polygon into one
+  mask, so areas are of the union. EU-27 only, and it writes Greece `GR` where
+  GISCO writes `EL`. Read into `context.parquet` as
+  `natura2000_km2`, `natura2000_flooded_km2_rp100`,
+  `natura2000_flooded_share_rp100` and `natura2000_grid_coverage`, measured on
+  the hazard raster's own 3 arc-second grid (see the module docstring for why
+  windows on the hazard grid are exact here). Checked against an exact vector
+  intersection on five regions (BE341, DE21H, HU110, NL230, RO213): within
+  0.3 %. The MapServer (`eea_natura2000_sites`) stays declared for provenance.
 - **CORINE Land Cover** — what the flooded ground actually *is*: industrial,
   agricultural, urban fabric. The least ready of the three and the only source
   here that is not anonymously downloadable: the product page answers 200, but the
   download goes through the Copernicus Land Monitoring Service and needs a
   registered account and an accepted licence. A pre-event errand with a human in
-  it, not a fetch job.
+  it, not a fetch job. Found 2026-10-12 and not used: the EEA datashare serves
+  the CLC 2018 *accounting layer* (`CLC2018ACC_V2018_20.tif`, 215,355,481 B,
+  100 m, EPSG:3035) anonymously, under
+  `eea_r_3035_100_m_clc-2018-acc_p_2017-2018_v01_r00`. It is a variant built for
+  change accounting, not the status layer, and no figure for land cover has been
+  designed yet (which classes, which measure), so taking it is a decision.
 
 ## Copernicus CDS — hydrology projections ✅ verified — and unsupported
 

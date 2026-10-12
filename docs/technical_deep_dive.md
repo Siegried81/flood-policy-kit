@@ -18,15 +18,16 @@ change to what a number means; this file describes the current state only.
 config/sources.yaml          one file owns every URL
         │
         ▼
-python -m src.fetch          64 files, ≈3.82 GiB, idempotent, robots-aware
+python -m src.fetch          65 files, ≈5.09 GiB, idempotent, robots-aware
         │
         ├───────────────┬──────────────┐
         ▼               ▼              ▼
 build_exposure.py  build_context.py  build_geometry.py
- hazard ×           built-up, basins,  boundaries →
- population         future discharge,  simplified polygons
- per NUTS3 × RP     GDP, density,
- + Eurostat         income, per NUTS3
+ hazard ×           built-up, Natura,  boundaries →
+ population         basins, future     simplified polygons
+ per NUTS3 × RP     discharge, GDP,
+ + Eurostat         density, income,
+                    per NUTS3
    indicators
         │               │              │
         ▼               ▼              ▼
@@ -386,6 +387,8 @@ summed to 473, a figure that had survived three suite changes by being typed.
 | `test_translate.py` | 12 | a translated figure never moves |
 | `test_events.py` | 11 | the coverage blind-spot probe |
 | `test_stripes.py` | 9 | the figure does not depend on the window count |
+| `test_environment.py` | 17 | Natura 2000 on flood-prone ground: the union not the sum, true cell areas, the masks, window-size invariance, not measured is not zero |
+| `test_mcp_server.py` | 12 | the three intent-shaped MCP tools, answered in flat TOON |
 | `test_assets.py` | 8 | the built-up surface: the archive, the unit, the share |
 | `test_docs_numbers.py` | 10 | a number typed in a doc that no longer matches the code fails the suite |
 | `test_legislation.py` | 7 | every legal citation has a CELEX and a URL, and `policy_answer.md` cites no article the registry lacks |
@@ -407,7 +410,7 @@ zonal statistic is the right arithmetic on the wrong piece of Europe. Measured o
 | Claim | Source |
 |---|---|
 | <!-- numbers:tests_collected -->650<!-- /numbers --> tests | `scripts/docs_numbers.py --write`, which runs `pytest --collect-only` and rewrites the marked blocks; the per-file counts are typed by hand |
-| 64 files, ≈3.82 GiB | `src.fetch.expand()` over `config/sources.yaml`; the bytes are the 6 October `Content-Length`, a floor since twelve documents were added on 12 October |
+| 65 files, ≈5.09 GiB | `src.fetch.expand()` over `config/sources.yaml`; the bytes are the 6 October `Content-Length` plus the Natura 2000 GeoPackage measured on 12 October, a floor since twelve documents were added on 12 October |
 | <!-- numbers:sources_declared -->54<!-- /numbers --> declared inputs, <!-- numbers:sources_verified -->46<!-- /numbers --> with a verification date, <!-- numbers:sources_licensed -->17<!-- /numbers --> with an explicit `licence:` | `scripts/docs_numbers.py` over `config/sources.yaml`: entries with an `id`; `verified` not null; `licence` non-empty |
 | 1,345 NUTS3 polygons | the GISCO NUTS 2024 file itself |
 | the 0.25% stripe discrepancy | two continental RP100 builds, 6 October 2026 |
