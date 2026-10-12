@@ -1069,6 +1069,54 @@ def test_a_build_that_finishes_while_the_page_is_open_is_picked_up():
     assert f"{len(table):,} rows" in _texts(after)
 
 
+def test_a_table_rebuilt_while_the_page_is_open_replaces_the_old_one():
+    """The mtime is the cache key so a rebuild is a cache miss. It was passed as
+    `_state`, and `st.cache_data` does not hash a parameter whose name starts
+    with an underscore: every mtime hit the first table read, and a rebuilt
+    exposure table stayed invisible until the server restarted."""
+    old, new = _nested_table(), _nested_table().head(3)
+    live = {"table": old, "mtime": 1.0}
+
+    class _Moving:
+        @property
+        def st_mtime(self):
+            return live["mtime"]
+
+    def exists(self, *args, **kwargs):
+        key = _key(self)
+        if key == _CACHE_KEY:
+            return True
+        if key in (_CONTEXT_KEY, _GEOMETRY_KEY):
+            return False
+        return _real_exists(self, *args, **kwargs)
+
+    def stat(self, *args, **kwargs):
+        key = _key(self)
+        if key == _CACHE_KEY:
+            return _Moving()
+        if key in (_CONTEXT_KEY, _GEOMETRY_KEY):
+            raise FileNotFoundError(2, "No such file or directory", str(self))
+        return _real_stat(self, *args, **kwargs)
+
+    st.cache_data.clear()
+    with (
+        patch.object(pathlib.Path, "exists", exists),
+        patch.object(pathlib.Path, "stat", stat),
+        patch.object(pd, "read_parquet", lambda *a, **k: live["table"]),
+        patch.object(svgmap, "load_features", lambda *a, **k: []),
+    ):
+        before = AppTest.from_file(str(APP), default_timeout=60).run()
+        assert f"{len(old):,} rows" in _texts(before)
+
+        live.update(table=new, mtime=2.0)  # the build rewrites the file
+        after = AppTest.from_file(str(APP), default_timeout=60).run()
+
+    assert after.exception == [], after.exception
+    assert f"{len(new):,} rows" in _texts(after), (
+        "the cache ignored the new mtime and served the table read before the rebuild"
+    )
+
+
 def test_a_table_frozen_before_the_units_rename_offers_the_current_name():
     """Both UIs read through `with_current_names`, so they offer one list."""
     table = _nested_table()
