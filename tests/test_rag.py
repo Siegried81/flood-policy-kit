@@ -194,8 +194,10 @@ def transcript(monkeypatch):
     # variables, a test that overrode only `GROQ_API_KEY` reached for the
     # developer's real SECOND key and printed it in a pytest traceback. CI has
     # none of them, so clearing them is also what makes these tests mean the
-    # same thing on both machines.
-    for name in rag.GROQ_KEY_VARS:
+    # same thing on both machines. The provider settings go too: the Compose
+    # services set OLLAMA_URL to the `ollama` container, and these tests assert
+    # the documented defaults, so inside `docker compose run test` they failed.
+    for name in (*rag.GROQ_KEY_VARS, "OLLAMA_URL", "OLLAMA_MODEL", "GROQ_MODEL"):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr(requests, "post", fake_post)
     return urls, replies
