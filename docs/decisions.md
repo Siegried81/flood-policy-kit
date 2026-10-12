@@ -1479,3 +1479,48 @@ completes, the four imports load, and the readiness script with no data says
 Also: the test counts rewritten to 551 on 10 October sat under two sentences
 still dated 8 October; re-measured today (551 passed) and dated so.
 
+
+## 2026-10-12 — the ensemble could not have grown past one simulation, and now reports its quartiles
+
+**What was wrong, measured before it mattered.** `ensemble_change_by_region`
+labelled each member by hydrological model, GCM and realisation, and not by
+regional model. The dataset drives three regional models from the same EC-EARTH
+r12i1p1 run (CCLM4-8-17, RACMO22E, RCA4), so the three got one label and each
+silently overwrote the last. Measured on a synthetic region whose three members
+read +10 %, +20 % and +30 %: `origin/main` reports **1 member and a median of
++30 %**, this branch **3 members and +20 %**. Nothing on disk triggered it - the
+archive holds one simulation through two models - but the first CDS download of
+a second regional model would have, with no error. The label now carries the
+regional model, and two files describing the same simulation are refused rather
+than counted as two opinions.
+
+The fetcher had the same blind spot: "already on disk" matched the model and the
+period only, so HadGEM2-ES/RCA4 through E-HYPEgrid would have been skipped because
+EC-EARTH/CCLM through E-HYPEgrid was present, and `check` never compared the GCM
+or the regional model of a downloaded file with the request.
+
+**NEW COLUMNS — `change_pct_ensemble_p25_<period>`, `change_pct_ensemble_p75_<period>`.**
+The quartiles (linear interpolation) of the members' regional medians. With
+sixteen members the range is two models' outliers, and the interquartile range
+is the interval to quote; with the two members on disk today the quartiles sit a
+quarter of the way in from each end of the range and say nothing the range does
+not. `ensemble_agrees_on_sign` keeps its meaning - every member points the same
+way, and one member is never agreement - and `change_pct_ensemble_min/max` are
+unchanged. No existing column moves: `context.parquet` was not rebuilt on this
+branch, because there is no new member to add.
+
+**What the fetcher does now.** `scripts/fetch_cds_member.py` knows the eight
+simulations the constraints file offers for both gridded models under RCP 8.5,
+and `--all-missing` plans one request per (simulation, model, period): 48 in all,
+**42 missing** against the archive today. Every file is checked on all five
+identifying fields in a staging directory before anything is moved.
+
+**Not fetched.** `.env` declares no CDS variable and no key was available, so the
+download is tested with a mocked client only. To run it: create a CDS account,
+accept the dataset licence on its download page, `pip install cdsapi`, put the
+key in `~/.cdsapirc` (or `CDSAPI_URL` + `CDSAPI_KEY`), then
+`python scripts/fetch_cds_member.py --all-missing` and
+`python scripts/build_context.py --stripes 72`.
+
+Tests (WSL, Python 3.14, no data/): **569 passed before, 579 after** - ten new
+tests in `tests/test_climate.py`, all offline, the CDS client mocked.
