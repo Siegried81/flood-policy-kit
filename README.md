@@ -138,6 +138,18 @@ belongs. **Neither container has ever been built:** the Docker daemon is not run
 reviewed but untested, and the first build belongs in the dress-rehearsal week
 rather than on the morning of the event.
 
+**Prebuilt image.** `.github/workflows/publish.yml` builds the code-only `app`
+stage on every push to `main` (and on `v*` tags), checks that the native stack
+loads, and pushes it to GitHub Container Registry. No build needed to run it:
+
+```bash
+docker pull ghcr.io/siegried81/flood-policy-kit:latest
+docker run --rm -p 8501:8501 -v "$PWD/data:/app/data" ghcr.io/siegried81/flood-policy-kit:latest
+```
+
+Add `--env-file .env` for an LLM key. The `portable` image (data baked in) is
+never published; build it locally.
+
 ## Docs, in reading order
 
 | Doc | Read it for |
