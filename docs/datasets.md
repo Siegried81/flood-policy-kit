@@ -705,7 +705,14 @@ model-by-period grid, which is a different thing and much easier to miss.
 `scripts/fetch_cds_member.py` makes that request reproducibly, and verifies every
 downloaded filename against what was asked before anything enters this
 directory: the failure that matters is not an empty download, it is the *wrong
-member* landing where the ensemble is computed.
+member* landing where the ensemble is computed. Since 2026-10-12 it knows the
+dataset's eight simulations (read off the CDS constraints file: EC-EARTH r12i1p1
+with CCLM4-8-17, RACMO22E and RCA4; HadGEM2-ES r1i1p1 with RACMO22E and RCA4;
+MPI-ESM-LR r1i1p1 and r2i1p1 with REMO2009, r1i1p1 with RCA4), checks the GCM
+and the regional model as well as the model, period and realisation, and
+`--all-missing` plans every gap: **42 requests** against the archive as it
+stands. It needs a CDS key; none exists on the development machine, so it is
+tested against a mocked client and the archive is unchanged.
 
 Note also that RP2 and RP10 exist **only** for 2071–2100, so they cannot carry a
 trajectory across periods: the other two periods have no counterpart to compare
@@ -718,7 +725,8 @@ return value has **two members on all three periods**. The dataset offers eight
 simulations; two of them disagreeing is information, and one of them alone is a
 plausible world rather than a projection.
 `climate.ensemble_change_by_region` reports the spread across whatever members
-are present and refuses to claim sign agreement from a single one — where only
+are present - the range and, since 2026-10-12, the quartiles of the members'
+medians - and refuses to claim sign agreement from a single one — where only
 one file exists, `ensemble_agrees_on_sign` is `False` by construction, which is
 the honest answer and not a bug. That is what 2071–2100 looked like until its
 VIC-WUR files arrived, and it is still what any period reduced to one chain will

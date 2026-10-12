@@ -584,6 +584,8 @@ with context_tab:
                 columns = [c for c in (
                     "nuts_id",
                     median_column,
+                    f"change_pct_ensemble_p25_{suffix}",
+                    f"change_pct_ensemble_p75_{suffix}",
                     f"change_pct_ensemble_min_{suffix}",
                     f"change_pct_ensemble_max_{suffix}",
                 ) if c in agreeing.columns]

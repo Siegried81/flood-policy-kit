@@ -8,6 +8,9 @@ cells gets no figure at all, and no mean or maximum is ever produced.
 
 from __future__ import annotations
 
+import sys
+import zipfile
+
 import geopandas as gpd
 import numpy as np
 import pytest
@@ -366,3 +369,174 @@ def test_the_request_asks_for_one_period_and_one_model():
     assert body["period"] == ["2071_2100"]
     assert body["hydrological_model"] == ["vic_wur"]
     assert body["variable_type"] == "relative_change_from_reference_period"
+
+
+# --- the full ensemble ----------------------------------------------------------
+
+def _named(model, gcm, rcm, member, period="2071-2100", variable="rdisreturnmax50"):
+    return (f"{variable}_tmean_rel_{model}_{gcm}_rcp85_{member}_{rcm}_"
+            f"{period}_1971-2000_grid5km_v1.nc")
+
+
+def test_three_regional_models_on_one_gcm_are_three_members(monkeypatch):
+    """EC-EARTH r12i1p1 drives CCLM, RACMO and RCA4 in this dataset. A member
+    label without the regional model gave the three the same key, so each new
+    chain silently replaced the last and the count stayed at one."""
+    values = iter([10.0, 20.0, 30.0])
+    monkeypatch.setattr(
+        climate, "read_change",
+        lambda p, variable=None: _grid([[next(values)] * 2] * 2),
+    )
+    paths = [
+        _named("E-HYPEgrid-EUR-11", "ICHEC-EC-EARTH", rcm, "r12i1p1")
+        for rcm in ("CLMcom-CCLM4-8-17-v1", "KNMI-RACMO22E-v1", "SMHI-RCA4-v1")
+    ]
+    out = climate.ensemble_change_by_region(_one_region(), paths, min_points=1)
+    assert out["ensemble_members"].iat[0] == 3
+    assert out["change_pct_ensemble_median"].iat[0] == pytest.approx(20.0)
+
+
+def test_the_same_simulation_twice_is_refused():
+    """A copy of a file is not a second opinion; counting it would make two
+    members agree with each other by construction."""
+    name = _named("E-HYPEgrid-EUR-11", "ICHEC-EC-EARTH", "CLMcom-CCLM4-8-17-v1", "r12i1p1")
+    with pytest.raises(ValueError, match="same simulation"):
+        climate.ensemble_change_by_region(
+            _one_region(), [name, "copy/" + name], min_points=1
+        )
+
+
+def test_the_ensemble_reports_quartiles_across_members(monkeypatch):
+    """With many members the extremes are each one model's outlier; the interval
+    to quote is the interquartile range of the members' medians."""
+    values = iter([0.0, 10.0, 20.0, 30.0, 400.0])
+    monkeypatch.setattr(
+        climate, "read_change",
+        lambda p, variable=None: _grid([[next(values)] * 2] * 2),
+    )
+    paths = [
+        _named("E-HYPEgrid-EUR-11", gcm, rcm, member)
+        for gcm, rcm, member in (
+            ("ICHEC-EC-EARTH", "CLMcom-CCLM4-8-17-v1", "r12i1p1"),
+            ("ICHEC-EC-EARTH", "SMHI-RCA4-v1", "r12i1p1"),
+            ("MOHC-HadGEM2-ES", "SMHI-RCA4-v1", "r1i1p1"),
+            ("MPI-M-MPI-ESM-LR", "MPI-CSC-REMO2009-v1", "r1i1p1"),
+            ("MPI-M-MPI-ESM-LR", "MPI-CSC-REMO2009-v1", "r2i1p1"),
+        )
+    ]
+    out = climate.ensemble_change_by_region(_one_region(), paths, min_points=1)
+    assert out["ensemble_members"].iat[0] == 5
+    assert out["change_pct_ensemble_median"].iat[0] == pytest.approx(20.0)
+    assert out["change_pct_ensemble_p25"].iat[0] == pytest.approx(10.0)
+    assert out["change_pct_ensemble_p75"].iat[0] == pytest.approx(30.0)
+    # The members did not agree: one says 0, which is neither up nor down.
+    assert bool(out["ensemble_agrees_on_sign"].iat[0]) is False
+
+
+def test_the_fetcher_knows_the_eight_simulations_and_two_models():
+    from scripts import fetch_cds_member as f
+
+    assert len(f.SIMULATIONS) == 8
+    assert len(set(f.SIMULATIONS)) == 8
+    assert set(f.MODELS) == {"vic_wur", "e_hypegrid"}
+    body = f.request("e_hypegrid", "2041_2070", ("hadgem2_es", "rca4", "r1i1p1"))
+    assert body["gcm"] == "hadgem2_es"
+    assert body["rcm"] == "rca4"
+    assert body["ensemble_member"] == ["r1i1p1"]
+    assert body["period"] == ["2041_2070"]
+
+
+def test_a_file_from_another_simulation_is_refused(tmp_path):
+    """Same model, same period, same realisation - and another regional model.
+    Without the GCM and RCM in the check this is the wrong member arriving
+    under the right name."""
+    from scripts.fetch_cds_member import check
+
+    racmo = _named("VIC-WUR-EUR-11", "ICHEC-EC-EARTH", "KNMI-RACMO22E-v1", "r12i1p1")
+    with pytest.raises(SystemExit, match="rcm"):
+        check(tmp_path / racmo, "vic_wur", "2071_2100", ("ec_earth", "rca4", "r12i1p1"))
+    fields = check(tmp_path / racmo, "vic_wur", "2071_2100",
+                   ("ec_earth", "racmo22e", "r12i1p1"))
+    assert fields["rcm"] == "KNMI-RACMO22E-v1"
+
+
+def test_on_disk_matches_every_field_not_only_model_and_period(tmp_path):
+    """EC-EARTH/CCLM through E-HYPEgrid being present says nothing about
+    HadGEM2/RCA4 through E-HYPEgrid; the old check said "already on disk"."""
+    from scripts import fetch_cds_member as f
+
+    for variable in f.FILE_VARIABLES:
+        (tmp_path / _named("E-HYPEgrid-EUR-11", "ICHEC-EC-EARTH",
+                           "CLMcom-CCLM4-8-17-v1", "r12i1p1",
+                           variable=variable)).write_bytes(b"")
+    assert len(f.on_disk("e_hypegrid", "2071_2100", f.SIMULATIONS[0], tmp_path)) == 2
+    assert f.on_disk("e_hypegrid", "2071_2100", ("hadgem2_es", "rca4", "r1i1p1"),
+                     tmp_path) == []
+    plan = f.missing(tmp_path)
+    assert ("e_hypegrid", "2071_2100", f.SIMULATIONS[0]) not in plan
+    assert len(plan) == 8 * 2 * 3 - 1
+
+
+def _fake_cds(tmp_path, names):
+    """A stand-in for `cdsapi.Client`: writes a ZIP holding `names` and records
+    the request. No network."""
+    calls = []
+
+    class Client:
+        def retrieve(self, dataset, body, target):
+            calls.append((dataset, body))
+            with zipfile.ZipFile(target, "w") as zf:
+                for name in names:
+                    zf.writestr(name, b"")
+
+    return Client(), calls
+
+
+def test_a_fetched_member_is_verified_then_moved(tmp_path):
+    from scripts import fetch_cds_member as f
+
+    sim = ("hadgem2_es", "rca4", "r1i1p1")
+    names = [_named("VIC-WUR-EUR-11", "MOHC-HadGEM2-ES", "SMHI-RCA4-v1", "r1i1p1",
+                    period="2041-2070", variable=v) for v in f.FILE_VARIABLES]
+    client, calls = _fake_cds(tmp_path, names)
+    added = f.fetch(client, "vic_wur", "2041_2070", sim, out_dir=tmp_path)
+    assert sorted(added) == sorted(names)
+    assert all((tmp_path / n).exists() for n in names)
+    assert calls[0][1]["gcm"] == "hadgem2_es"
+    assert not list(tmp_path.glob(".staging_*"))
+
+
+def test_a_wrong_member_in_the_archive_adds_nothing(tmp_path):
+    from scripts import fetch_cds_member as f
+
+    sim = ("hadgem2_es", "rca4", "r1i1p1")
+    wrong = _named("VIC-WUR-EUR-11", "MOHC-HadGEM2-ES", "KNMI-RACMO22E-v2",
+                   "r1i1p1", period="2041-2070")
+    client, _ = _fake_cds(tmp_path, [wrong])
+    with pytest.raises(SystemExit, match="rcm"):
+        f.fetch(client, "vic_wur", "2041_2070", sim, out_dir=tmp_path)
+    assert not list(tmp_path.glob("*.nc"))
+    assert not list(tmp_path.glob(".staging_*"))
+
+
+def test_no_credentials_stops_before_any_client_is_built(tmp_path, monkeypatch, capsys):
+    """The key is looked for, never read: the check is the variable's presence
+    and the file's existence."""
+    from scripts import fetch_cds_member as f
+
+    monkeypatch.delenv("CDSAPI_KEY", raising=False)
+    monkeypatch.setattr(f.Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setattr(f, "OUT_DIR", tmp_path / "cds")
+    monkeypatch.setattr(sys, "argv", ["fetch_cds_member.py", "--all-missing"])
+    with pytest.raises(SystemExit, match="No CDS credentials"):
+        f.main()
+
+
+def test_the_dry_run_lists_every_missing_member_without_credentials(tmp_path, monkeypatch, capsys):
+    from scripts import fetch_cds_member as f
+
+    monkeypatch.delenv("CDSAPI_KEY", raising=False)
+    monkeypatch.setattr(f, "OUT_DIR", tmp_path / "cds")
+    monkeypatch.setattr(sys, "argv", ["fetch_cds_member.py", "--all-missing", "--dry-run"])
+    assert f.main() == 0
+    assert "48 request(s)" in capsys.readouterr().out

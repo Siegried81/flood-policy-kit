@@ -376,7 +376,7 @@ summed to 473, a figure that had survived three suite changes by being typed.
 | `test_basins.py` | 27 | the shared-basin layer: the declared crosswalk, the sliver floor |
 | `test_exposure.py` | 23 | the two modes, `nodata_means_dry`, the masks, the build checkpoint |
 | `test_workflow.py` | 23 | the five nodes, the guards, the human gate |
-| `test_climate.py` | 21 | the future layer: provenance, the median, the ensemble, the member fetcher |
+| `test_climate.py` | 31 | the future layer: provenance, the median, the ensemble and its quartiles, a member per simulation, the fetcher against a mocked CDS |
 | `test_vulnerability.py` | 21 | the composite index, its sensitivity, and what one indicator cannot prove |
 | `test_rdh.py` | 16 | the paged client and its cache |
 | `test_toon_io.py` | 15 | the compact table encoding for prompts, and a tokenizer that cannot fetch its table says so |

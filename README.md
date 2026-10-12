@@ -103,7 +103,7 @@ flood-policy-kit/
 ├── scripts/
 │   ├── build_exposure.py            # freezes data/processed/exposure.parquet, one row per NUTS3 x RP
 │   ├── build_context.py             # freezes data/processed/context.parquet, what qualifies an exposure figure
-│   ├── fetch_cds_member.py          # one CDS ensemble member, verified against what was asked
+│   ├── fetch_cds_member.py          # CDS ensemble members, each verified against what was asked
 │   ├── build_geometry.py            # freezes data/processed/regions.geojson, the choropleth's polygons
 │   └── check_offline_readiness.py   # is this laptop demo-ready with the Wi-Fi off?
 ├── api/main.py                 # JSON API over src/, for the React UI

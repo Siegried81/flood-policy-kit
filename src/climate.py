@@ -184,7 +184,12 @@ def ensemble_change_by_region(
     - `change_pct_ensemble_median` - the median OF the members' medians. The
       figure to quote, and only with the member count beside it.
     - `change_pct_ensemble_min`, `change_pct_ensemble_max` - the range across
-      members. This is the interval a jury is asking for.
+      members. Each end is a median of one member, never a cell maximum, so it
+      is bounded; but with many members it is one model's outlier.
+    - `change_pct_ensemble_p25`, `change_pct_ensemble_p75` - the quartiles of
+      the members' medians, linearly interpolated. The interval to quote once
+      the ensemble holds more than two chains. With two members they sit a
+      quarter of the way in from each end of the range and add nothing to it.
     - `ensemble_members` - how many members contributed a figure for this unit.
     - `ensemble_agrees_on_sign` - True when every member points the same way.
       The one column that licenses a sentence: "flood discharge increases here"
@@ -210,12 +215,26 @@ def ensemble_change_by_region(
                 f"would take the median of two different quantities."
             )
 
+    # Each member's own label, so a caller can see which ones contributed.
+    # Every field that tells two simulations apart is in it, the regional model
+    # included: EC-EARTH r12i1p1 drives three RCMs in this dataset, and a label
+    # without the RCM gave all three the same key, so each new chain silently
+    # replaced the last and the ensemble shrank without a word.
+    tags = [
+        "_".join(f[k] for k in ("hydro_model", "gcm", "rcm", "member"))
+        for f in fields
+    ]
+    duplicated = sorted({t for t in tags if tags.count(t) > 1})
+    if duplicated:
+        raise ValueError(
+            f"Two files describe the same simulation ({duplicated}). A duplicate "
+            f"is not a second opinion; remove one before aggregating."
+        )
+
     medians = {}
-    for path in paths:
+    for path, tag in zip(paths, tags):
         lon, lat, values = read_change(path)
         member = change_by_region(admin, lon, lat, values, min_points=min_points)
-        # The member's own label, so a caller can see which ones contributed.
-        tag = "_".join(describe(path)[k] for k in ("hydro_model", "gcm", "member"))
         medians[tag] = member["change_pct_median"]
 
     frame = pd.DataFrame(medians)
@@ -227,6 +246,11 @@ def ensemble_change_by_region(
             "change_pct_ensemble_median": frame.median(axis=1, skipna=True),
             "change_pct_ensemble_min": frame.min(axis=1, skipna=True),
             "change_pct_ensemble_max": frame.max(axis=1, skipna=True),
+            # The interquartile range of the members' medians: the spread to
+            # quote once the ensemble is more than two chains, because the
+            # extremes of sixteen members are each one model's outlier.
+            "change_pct_ensemble_p25": frame.quantile(0.25, axis=1),
+            "change_pct_ensemble_p75": frame.quantile(0.75, axis=1),
             "ensemble_members": counted.astype("int64"),
             # A single member trivially "agrees with itself". Saying True there
             # would licence exactly the sentence this column exists to stop, so

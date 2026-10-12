@@ -555,14 +555,19 @@ geodata:
       NO LONGER SUPPORTED by the data providers (notice dated 2025-01-29): the
       data and documentation stand as they are, and nobody is fixing them. Say so
       rather than letting a juror find it.
-      Fetched BY HAND through the CDS download form, not by any code here: the
-      form is where a request's cost is checked against the cap below, and where
-      the exact variable, experiment and period identifiers come from. Put the
-      resulting `.nc` files in `data/raw/download/cds_hydrology_projections/`,
-      which is what `src/climate.py` reads; it needs no credential and there is
-      no `CDS_API_KEY`. A free CDS account is needed to use the form - create it
-      early, and note that `src.fetch` and the offline readiness check know
-      nothing about these files. The CDS Terms of Use change on 28 October 2026 - the day
+      The two members on disk were fetched BY HAND through the CDS download form.
+      The rest are requested by scripts/fetch_cds_member.py (`--all-missing`),
+      one simulation, one model and one period per request so each stays under
+      the cost cap below and each file can be checked against what was asked.
+      That script needs a free CDS account, the dataset's licence accepted on
+      its download page, `pip install cdsapi`, and the key in ~/.cdsapirc or
+      CDSAPI_KEY; `src/climate.py`, which reads the `.nc` files in
+      `data/raw/download/cds_hydrology_projections/`, needs no credential.
+      `src.fetch` and the offline readiness check know nothing about these
+      files. Eight simulations offered for the gridded models under RCP 8.5,
+      read off the constraints file 2026-10-12: EC-EARTH r12i1p1 with CCLM4-8-17,
+      RACMO22E and RCA4; HadGEM2-ES r1i1p1 with RACMO22E and RCA4; MPI-ESM-LR
+      with REMO2009 (r1i1p1 and r2i1p1) and RCA4 (r1i1p1). The CDS Terms of Use change on 28 October 2026 - the day
       before the event - and continued use after that date is acceptance.
       Requests are COST-CAPPED at 1000, and the cost is the product of the boxes
       ticked, not their sum: the form's own default selection (11 variables x 10

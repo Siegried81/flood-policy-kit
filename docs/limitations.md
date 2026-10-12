@@ -99,7 +99,9 @@ rebuilt. The findings and recommendations themselves are in
   offers eight simulations; on disk every file is `ICHEC-EC-EARTH r12i1p1`
   under RCP 8.5 through E-HYPEgrid and VIC-WUR. The ensemble agrees on the sign
   in 976, 994 and 943 of 1,345 regions for the three horizons, and one member
-  never counts as agreement with itself. Regions where the two chains disagree
+  never counts as agreement with itself. The other seven simulations are
+  fetched by `scripts/fetch_cds_member.py --all-missing` once a CDS key exists
+  (see "Built after the freeze" in §2). Regions where the two chains disagree
   keep their colour on the map and are hatched, which is a third statement:
   measured, direction unsupported.
   [`datasets.md`](datasets.md#copernicus-cds--hydrology-projections--verified--and-unsupported),
@@ -180,10 +182,6 @@ written intent rather than from memory.
   Land Cover is declared with `DECLARED, NOT YET USED` in its caveat, needs a
   CLMS account for the status layer, and has no figure designed yet; no heritage
   source is declared at all. Design: [`datasets.md`](datasets.md#environment-natura-2000-measured-corine-land-cover-not-yet).
-- **The full CDS ensemble.** Two of the eight offered simulations are on disk;
-  `scripts/fetch_cds_member.py` fetches one member at a time and verifies the
-  filename against the request. Design: [`datasets.md`](datasets.md#copernicus-cds--hydrology-projections--verified--and-unsupported),
-  [`scripts/fetch_cds_member.py`](../scripts/fetch_cds_member.py).
 - **Depth-against-depth validation.** Blocked on a re-minted download URL for
   the Walloon IDW depth layer. Design: [`datasets.md`](datasets.md#wallonia-observed-july-2021--the-second-ground-truth--one-layer-verified-one-dead).
 - **The model-versus-observation map for Europe.** The satellite-derived flood
@@ -255,6 +253,17 @@ written intent rather than from memory.
   (CORINE) and cultural heritage are still not measured (§2).
   [`src/environment.py`](../src/environment.py),
   [`datasets.md`](datasets.md#environment-natura-2000-measured-corine-land-cover-not-yet).
+- **The full CDS ensemble: the code** (2026-10-12), **not the data.**
+  `scripts/fetch_cds_member.py --all-missing` requests every one of the eight
+  simulations through both gridded models for the three periods (48 requests,
+  42 of them missing today, one member each) and verifies the GCM, the regional
+  model, the realisation, the model and the period of every file before it
+  enters the ensemble directory; the ensemble reports the quartiles of its
+  members' medians. It is tested with a mocked CDS client only: no CDS key
+  exists on the development machine, so the archive is still the one simulation
+  described in §1 until someone runs it with one.
+  [`scripts/fetch_cds_member.py`](../scripts/fetch_cds_member.py),
+  [`decisions.md`, 2026-10-12](decisions.md#2026-10-12--the-ensemble-could-not-have-grown-past-one-simulation-and-now-reports-its-quartiles).
 
 ## 3. What a Member State or the Commission would still have to do
 
