@@ -139,11 +139,13 @@ reviewed but untested, and the first build belongs in the dress-rehearsal week
 rather than on the morning of the event.
 
 **Prebuilt image.** `.github/workflows/publish.yml` builds the code-only `app`
-stage on every push to `main` (and on `v*` tags), checks that the native stack
-loads, and pushes it to GitHub Container Registry. No build needed to run it:
+stage on every push to `main` (and on `v*` tags), starts it and waits for the
+Streamlit health check, then pushes it to GitHub Container Registry and, when
+the `DOCKERHUB_*` secrets are set, to Docker Hub (page text: `DOCKERHUB.md`).
+No build needed to run it:
 
 ```bash
-docker pull ghcr.io/siegried81/flood-policy-kit:latest
+docker pull ghcr.io/siegried81/flood-policy-kit:latest     # or siegried/flood-policy-kit on Docker Hub
 docker run --rm -p 8501:8501 -v "$PWD/data:/app/data" ghcr.io/siegried81/flood-policy-kit:latest
 ```
 
