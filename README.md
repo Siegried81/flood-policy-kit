@@ -134,9 +134,22 @@ measure rather than believe either state** — measured 2026-10-08, `import
 rasterio` works and the whole suite runs on Windows: **<!-- numbers:tests_collected -->569<!-- /numbers --> passed, nothing
 deselected**. The WSL2 venv stays anyway, because it is the only route that does
 not depend on the policy's mood and it is where a continental raster build
-belongs. **Neither container has ever been built:** the Docker daemon is not running on this machine, so both are
-reviewed but untested, and the first build belongs in the dress-rehearsal week
-rather than on the morning of the event.
+belongs. **The `app` image was built and run on 2026-10-12:** `rasterio`,
+`pyogrio`, `rasterstats` and `tiktoken` all import inside it. Run there without
+`data/` or `.env`, the suite gave 562 passed and 7 failed, every failure a
+provider test reading the `OLLAMA_URL` that Compose sets (fixed on
+`fix/hermetic-llm-tests-12-10`). Through `docker compose run test` it gave 558
+passed and 11 failed: the same 7, and 4 not yet diagnosed. An image built on
+2026-10-09 could not import `rasterio` (`libexpat.so.1` missing) while a fresh
+build of the same Dockerfile can, so rebuild rather than trust an old local
+image: `docker compose build`. The `portable` image has not been built yet.
+
+**VS Code dev container.** `.devcontainer/` opens the editor inside that image
+(`Ctrl+Shift+P` → *Dev Containers: Reopen in Container*): a `dev` service with
+the checkout mounted at `/workspaces/flood-policy-kit`, `data/` included, so
+tests and raster work run on Linux without the WSL venv. It leaves `app` and
+`api` untouched and runs nothing until you do; Streamlit and the API started
+from its terminal are forwarded on 8501 and 8010.
 
 ## Docs, in reading order
 
