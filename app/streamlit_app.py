@@ -118,23 +118,24 @@ def load_geometry() -> list[dict] | None:
     return None if state is None else _load_geometry(state)
 
 
-# The cached halves. `_state` is the cache KEY and is deliberately unused in the
-# body: it is the artefact's mtime, so a rebuilt file is a cache miss and a file
-# that never moved is a hit.
+# The cached halves. `mtime` is the cache KEY and is deliberately unused in the
+# body: a rebuilt file is a cache miss and a file that never moved is a hit. It
+# must not start with an underscore: `st.cache_data` leaves such parameters out
+# of the key, and every mtime would then hit the first table ever read.
 @st.cache_data
-def _load_exposure(_state: float) -> pd.DataFrame:
+def _load_exposure(mtime: float) -> pd.DataFrame:
     # Current column names whichever build froze the table, exactly as the API
     # reads it, so the two UIs cannot offer differently named indicators.
     return with_current_names(pd.read_parquet(EXPOSURE_CACHE))
 
 
 @st.cache_data
-def _load_context(_state: float) -> pd.DataFrame:
+def _load_context(mtime: float) -> pd.DataFrame:
     return pd.read_parquet(CONTEXT_CACHE)
 
 
 @st.cache_data
-def _load_geometry(_state: float) -> list[dict]:
+def _load_geometry(mtime: float) -> list[dict]:
     return svgmap.load_features(GEOMETRY_CACHE)
 
 
