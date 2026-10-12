@@ -90,6 +90,7 @@ flood-policy-kit/
 │   ├── losses.py               # RDH loss rows → a levelled, joinable table
 │   ├── events.py               # blind-spot probe over reported coverage (not evidence)
 │   ├── assets.py               # built-up surface exposed: the asset half of exposure
+│   ├── environment.py          # Natura 2000 area on flood-prone ground (context, not exposure)
 │   ├── climate.py              # future flood hazard per region, from the CDS projections
 │   ├── basins.py               # river basin districts: exposed in a basin you do not control
 │   ├── apsfr.py                # what the Member State declared at risk, vs what the model shows
@@ -102,7 +103,7 @@ flood-policy-kit/
 ├── scripts/
 │   ├── build_exposure.py            # freezes data/processed/exposure.parquet, one row per NUTS3 x RP
 │   ├── build_context.py             # freezes data/processed/context.parquet, what qualifies an exposure figure
-│   ├── fetch_cds_member.py          # one CDS ensemble member, verified against what was asked
+│   ├── fetch_cds_member.py          # CDS ensemble members, each verified against what was asked
 │   ├── build_geometry.py            # freezes data/processed/regions.geojson, the choropleth's polygons
 │   └── check_offline_readiness.py   # is this laptop demo-ready with the Wi-Fi off?
 ├── api/main.py                 # JSON API over src/, for the React UI
@@ -133,7 +134,7 @@ refused `rasterio`'s own GDAL build, which no pin fixed; by 2026-10-08 it allowe
 the same wheel again with nothing reinstalled. **The policy moves both ways, so
 measure rather than believe either state** — measured 2026-10-12, it blocks
 `import rasterio` again, so the three raster test modules do not collect on
-Windows, while the WSL2 venv runs the whole suite: **<!-- numbers:tests_collected -->650<!-- /numbers --> passed, nothing
+Windows, while the WSL2 venv runs the whole suite: **<!-- numbers:tests_collected -->688<!-- /numbers --> passed, nothing
 deselected**. The WSL2 venv stays, because it is the only route that does
 not depend on the policy's mood and it is where a continental raster build
 belongs. **The `app` image was built and run on 2026-10-12:** `rasterio`,
@@ -193,7 +194,7 @@ never published; build it locally.
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m pytest -q           # <!-- numbers:tests_collected -->650<!-- /numbers --> tests, offline: no network, no model
+.venv/bin/python -m pytest -q           # <!-- numbers:tests_collected -->688<!-- /numbers --> tests, offline: no network, no model
                                         # Measured 2026-10-12 in WSL2, nothing
                                         # deselected. Smart App Control blocks
                                         # rasterio on Windows some days and not
@@ -202,8 +203,8 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
                                         # requirements.txt for the whole story.
                                         #   wsl -d Ubuntu
                                         #   ~/.venvs/flood/bin/python -m pytest -q
-.venv/bin/python -m src.fetch           # 37 geodata downloads + 24 policy_corpus
-                                        # + 3 context = 64 files, ≈3.82 GiB
+.venv/bin/python -m src.fetch           # 38 geodata downloads + 24 policy_corpus
+                                        # + 3 context = 65 files, ≈5.09 GiB
                                         # (before 25 Oct, once)
 .venv/bin/python scripts/build_exposure.py --stripes 72 # -> data/processed/exposure.parquet
 .venv/bin/python scripts/build_context.py  --stripes 72 # -> data/processed/context.parquet
@@ -281,9 +282,9 @@ with no tile provider and no API key, so the map still works with the network
 unplugged. Streamlit is the fallback that needs no `npm`.
 
 Data is **not** committed (`data/` is ignored): run `.venv/bin/python -m src.fetch` to
-download what `config/sources.yaml` declares — **27 `geodata` entries that expand
-to 49 jobs, of which 37 are downloadable files at ≈3.78 GiB** (the other twelve are
-`access: api`, queried at runtime and never stored), or **64 files and ≈3.82 GiB**
+download what `config/sources.yaml` declares — **30 `geodata` entries that expand
+to 52 jobs, of which 38 are downloadable files at ≈5.05 GiB** (the other fourteen are
+`access: api`, queried at runtime and never stored), or **65 files and ≈5.09 GiB**
 once the `policy_corpus` (24 entries) and `context` (3) sections are included —
 every one of those twenty-seven a `scrape`. Of the geodata, the nine return periods are
 2.61 GiB. Do this **before 25 October** — the Wi-Fi of a 60-person hackathon will
@@ -292,7 +293,7 @@ costs only the files that are still missing.
 
 Those counts are `src.fetch.expand()` applied to `sources.yaml` as it stood on
 12 October 2026, and the byte totals are the `Content-Length` the hosts returned
-on 6 October — a reading of the config, not a property of the repo. The twelve
+on 6 October (12 October for the Natura 2000 GeoPackage, 1.27 GiB) — a reading of the config, not a property of the repo. The twelve
 policy documents declared on 12 October are not in the byte total: two of them
 measure 0.37 MiB together and the other hosts send no `Content-Length`, so the
 total is a floor until a fetch measures them. Every entry

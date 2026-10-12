@@ -584,6 +584,8 @@ with context_tab:
                 columns = [c for c in (
                     "nuts_id",
                     median_column,
+                    f"change_pct_ensemble_p25_{suffix}",
+                    f"change_pct_ensemble_p75_{suffix}",
                     f"change_pct_ensemble_min_{suffix}",
                     f"change_pct_ensemble_max_{suffix}",
                 ) if c in agreeing.columns]
@@ -673,6 +675,65 @@ with context_tab:
                               if c in context.columns]
             st.dataframe(
                 context.nlargest(15, "shared_basin_share")[basins_columns],
+                width="stretch",
+            )
+
+        natura_prefix = "natura2000_flooded_share_rp"
+        natura_column = next(
+            (c for c in context.columns if c.startswith(natura_prefix)), None
+        )
+        if natura_column:
+            natura_rp = natura_column[len(natura_prefix):]
+            flooded_column = f"natura2000_flooded_km2_rp{natura_rp}"
+            st.markdown(f"#### Natura 2000 on flood-prone ground, 1-in-{natura_rp} year flood")
+            st.caption(
+                "Article 6(5) asks flood risk maps to show the consequences for the "
+                "environment. This is an AREA, not a harm: a floodplain forest is "
+                "meant to flood, and the figure says nothing about which habitat. "
+                "Regions outside the EU-27 carry no figure (the network does not "
+                "exist there), which is not a measured zero."
+            )
+            # Summed only where both areas exist, so the share is the ratio of
+            # two areas measured on the same grid cells and stays in [0, 1].
+            measured = context[context["natura2000_km2"].notna()
+                               & context[flooded_column].notna()]
+            total_km2 = measured["natura2000_km2"].sum()
+            if total_km2 > 0:
+                flooded_km2 = measured[flooded_column].sum()
+                st.metric(
+                    "Natura 2000 land on flood-prone ground",
+                    f"{flooded_km2:,.0f} of {total_km2:,.0f} km² "
+                    f"({flooded_km2 / total_km2:.1%})",
+                    help="Water at least 0.5 m deep at this return period, masked "
+                         "like the exposure table. `natura2000_grid_coverage` below "
+                         "1 means part of the region lies off the hazard grid.",
+                )
+            natura_columns = [c for c in ("nuts_id", flooded_column, "natura2000_km2",
+                                          natura_column, "natura2000_grid_coverage")
+                              if c in context.columns]
+            st.dataframe(
+                context.nlargest(15, flooded_column)[natura_columns], width="stretch",
+            )
+
+        if "pop_density_per_km2" in context.columns:
+            st.markdown("#### Population density and household income")
+            st.caption(
+                "Context for reading a headcount, kept out of the vulnerability "
+                "index on purpose: adding either to it is a weighting decision. "
+                "Density says how concentrated the people are, which changes what "
+                "an evacuation is. Income is net disposable income per inhabitant "
+                "in purchasing power standards, so it compares across countries; "
+                "it is published per NUTS2 and repeated on each NUTS3 child, and "
+                "covers the EU-27 only."
+            )
+            people_columns = [c for c in ("nuts_id", "pop_density_per_km2",
+                                          "pop_density_year",
+                                          "household_income_pps_per_hab",
+                                          "household_income_year",
+                                          "household_income_level")
+                              if c in context.columns]
+            st.dataframe(
+                context.nlargest(15, "pop_density_per_km2")[people_columns],
                 width="stretch",
             )
 

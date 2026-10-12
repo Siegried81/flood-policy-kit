@@ -130,8 +130,13 @@ def fetch(dataset: str, *, use_cache: bool = True, **params: Any) -> dict:
     return payload
 
 
-def tidy(payload: dict) -> pd.DataFrame:
+def tidy(payload: dict, *, with_status: bool = False) -> pd.DataFrame:
     """A JSON-stat 2.0 cube as one row per cell: a column per dimension, plus `value`.
+
+    `with_status` adds a `status` column carrying Eurostat's flag for the cell
+    ("p" provisional, "e" estimated, "b" break in series), or None when the cell
+    carries none. The flags live in a second sparse dict keyed by the same flat
+    offsets, so they are read here rather than re-decoded by each caller.
 
     JSON-stat stores values in a SPARSE dict keyed by the flat row-major offset
     into the cube, not by coordinates - `{"0": 620167, "11": 637220}` - and a
@@ -152,6 +157,7 @@ def tidy(payload: dict) -> pd.DataFrame:
         for dim in ids
     ]
 
+    status = payload.get("status") or {}
     rows = []
     for flat, value in payload["value"].items():
         remaining = int(flat)
@@ -163,21 +169,51 @@ def tidy(payload: dict) -> pd.DataFrame:
         position.reverse()
         row = {dim: codes[i][position[i]] for i, dim in enumerate(ids)}
         row["value"] = value
+        if with_status:
+            row["status"] = status.get(flat)
         rows.append(row)
     return pd.DataFrame(rows)
 
 
+#: A year still being released is one that carries values for fewer than this
+#: share of the regions the year before it carries. See `_latest`.
+MIN_YEAR_COVERAGE = 0.9
+
+
 def _latest(frame: pd.DataFrame) -> tuple[pd.DataFrame, str]:
-    """The most recent year that actually carries values, and which one it was.
+    """The most recent year that is substantially published, and which one it was.
 
     Not `max(time)`: the cube advertises years that are entirely unpublished at
     NUTS3, and selecting one of those returns an empty indicator that reads as
     "nobody is old here".
+
+    And not "the most recent year with any value" either: Eurostat releases a
+    new year country by country, so the newest year is often a fraction of the
+    map. Measured 2026-10-12 on `nama_10r_3gdp` (MIO_EUR, NUTS3): 1,307 regions
+    in 2023 and 536 in 2024, so "any value" picked 2024 and left GDP blank for
+    roughly 770 regions that 2023 covers.
+
+    So, walking back from the newest year, a year is taken once it covers at
+    least `MIN_YEAR_COVERAGE` of the regions the year before it covers. Compared
+    with the year before rather than with the best year ever, because older years
+    carry codes from earlier NUTS vintages and from the United Kingdom - the age
+    cube has 1,589 regions in 2019 and 1,338 in 2025 - and a best-year floor would
+    send every indicator back to a pre-Brexit vintage. Regions, not cells: a cube
+    with an age or unit dimension carries several cells per region.
     """
     if frame.empty:
         raise EurostatUnavailable("no values in the cube at all")
-    counts = frame.groupby("time")["value"].count()
-    year = str(counts[counts > 0].index.max())
+    counts = frame.dropna(subset=["value"]).groupby("time")["geo"].nunique()
+    counts = counts[counts > 0].sort_index()
+    if counts.empty:
+        raise EurostatUnavailable("no values in the cube at all")
+    years = list(counts.index)
+    year = years[0]
+    for newer, older in zip(reversed(years), reversed([None] + years[:-1])):
+        if older is None or counts[newer] >= MIN_YEAR_COVERAGE * counts[older]:
+            year = newer
+            break
+    year = str(year)
     return frame[frame["time"] == year], year
 
 
@@ -266,6 +302,92 @@ def gdp_meur(*, use_cache: bool = True) -> pd.DataFrame:
     frame, year = _latest(frame)
     out = frame.set_index("geo")[["value"]].rename(columns={"value": "gdp_meur"})
     out["gdp_meur_year"] = year
+    return out
+
+
+def _flag(frame: pd.DataFrame) -> pd.Series:
+    """Eurostat's status flag per region, as text, or None where there is none.
+
+    Kept beside the figure rather than dropped: a provisional ("p") or estimated
+    ("e") value is still the published value, but a brief quoting it has to be
+    able to say so.
+    """
+    status = frame.set_index("geo")["status"].astype(object)
+    return status.where(status.notna(), None)
+
+
+def population_density(*, use_cache: bool = True) -> pd.DataFrame:
+    """Persons per km2, per NUTS3 region (`demo_r_d3dens`).
+
+    Context, not a vulnerability indicator: density says how concentrated a
+    region's people are, which qualifies an exposure count (an evacuation in a
+    dense arrondissement is a different operation from one in a rural one)
+    without making any resident more or less vulnerable. It therefore lives in
+    `context.parquet`; promoting it into the index is a weighting decision.
+
+    The unit is pinned to `PER_KM2` and carried in the column name. The vintage
+    and flag are text, like every other vintage in this module, so neither can
+    be picked up as a numeric column.
+    """
+    payload = fetch("demo_r_d3dens", use_cache=use_cache, unit="PER_KM2")
+    frame = tidy(payload, with_status=True)
+    frame = frame[frame["geo"].str.len() == 5]
+    frame, year = _latest(frame)
+    out = frame.set_index("geo")[["value"]].rename(
+        columns={"value": "pop_density_per_km2"}
+    )
+    out["pop_density_year"] = year
+    out["pop_density_flag"] = _flag(frame)
+    return out
+
+
+def household_income(*, use_cache: bool = True) -> pd.DataFrame:
+    """Net disposable household income per inhabitant, in PPS, per NUTS2 region.
+
+    `nama_10r_2hhinc`, pinned to `na_item=B6N` (disposable income, net),
+    `direct=BAL` and `unit=PPS_EU27_2020_HAB`. Purchasing power standards rather
+    than euros, because the column exists to compare regions across countries
+    and a euro buys about three times as much in Bulgaria as in Luxembourg; the
+    PPS figure is the one Eurostat itself uses for that comparison. The cube
+    also carries `MIO_EUR`, `EUR_HAB`, `MIO_NAC` and `MIO_PPS_EU27_2020`, five
+    different numbers under one dataset code, so the unit is in the column name.
+
+    Published at NUTS2 only, like the poverty rate, and applied to each NUTS3
+    child by `context_indicators`; `household_income_level` says so as text.
+    """
+    payload = fetch(
+        "nama_10r_2hhinc", use_cache=use_cache,
+        unit="PPS_EU27_2020_HAB", na_item="B6N", direct="BAL",
+    )
+    frame = tidy(payload, with_status=True)
+    frame = frame[frame["geo"].str.len() == 4]
+    frame, year = _latest(frame)
+    out = frame.set_index("geo")[["value"]].rename(
+        columns={"value": "household_income_pps_per_hab"}
+    )
+    out["household_income_year"] = year
+    out["household_income_flag"] = _flag(frame)
+    out["household_income_level"] = "NUTS2, applied to its NUTS3 children"
+    return out
+
+
+def context_indicators(
+    nuts_ids: pd.Index | list[str], *, use_cache: bool = True
+) -> pd.DataFrame:
+    """Population density and household income, reindexed onto `nuts_ids`.
+
+    For `context.parquet`, never `exposure.parquet`: `api/main.py` picks the
+    vulnerability index's inputs by scanning the exposure table's numeric
+    columns, and neither of these is a property that makes a resident more
+    vulnerable by itself being larger. A region Eurostat does not publish stays
+    NaN; a NUTS2 figure reaches a NUTS3 code through its first four characters.
+    """
+    index = pd.Index(nuts_ids, name="nuts_id")
+    out = population_density(use_cache=use_cache).reindex(index)
+    income = household_income(use_cache=use_cache)
+    parents = pd.Series(index.str[:4], index=index)
+    for column in income.columns:
+        out[column] = parents.map(income[column])
     return out
 
 

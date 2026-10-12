@@ -1631,3 +1631,219 @@ same list and the same ranking whichever name is asked.
 Tests: 569 before, 579 after (3 new in `tests/test_demographics.py`, 6 in
 `tests/test_api.py`, 1 in `tests/test_streamlit_app.py`), all passing in WSL2
 with no `data/`.
+
+## 2026-10-12 — density and household income reach the context table, and GDP reads a year that covers the map
+
+**NEW COLUMNS in `context.parquet` (not `exposure.parquet`).**
+
+- `pop_density_per_km2` — persons per km2, `demo_r_d3dens`, unit pinned to
+  `PER_KM2`, NUTS3, year 2024: **1,279 of 1,345 regions**. The 66 blanks are a
+  vintage mismatch (the 2024 values sit on NUTS 2021 codes: the eight new Belgian
+  codes, ITG2D-H, six Croatian, two Estonian, Serbia, Kosovo, most of Norway),
+  not empty regions.
+- `household_income_pps_per_hab` — net disposable income of private households
+  per inhabitant, `nama_10r_2hhinc` pinned to `na_item=B6N`, `direct=BAL`,
+  `unit=PPS_EU27_2020_HAB`, year 2023, **NUTS2 applied to its NUTS3 children**:
+  **1,165 regions**, the EU-27 and nothing else. PPS rather than euros because the
+  column exists to compare regions across countries; the cube carries five units
+  under one code, so the unit is in the name.
+- Beside them, as text: `pop_density_year`, `pop_density_flag`,
+  `household_income_year`, `household_income_flag` (Eurostat's `p`/`e`/`b`) and
+  `household_income_level`.
+
+**Why context and not indicators.** Density says how concentrated people are,
+income how much a household has to recover with; neither is put into the
+vulnerability index by this change. `api/main.py::vulnerability_indicators` scans
+the numeric columns of `exposure.parquet`, so placing them there would have made
+them index terms by accident. Adding either to the index is a weighting decision
+for a human, and the index is unchanged.
+
+**MEASUREMENT CHANGE — `gdp_meur` / `gdp_meur_year`, and the rule behind them.**
+`demographics._latest` took "the most recent year with any value". Eurostat
+releases a year country by country, so for GDP that was 2024 with **536**
+regions published, against **1,307** for 2023. The frozen table carries
+`gdp_meur` for **524** of 1,345 regions, all 2024. The entry of 2026-10-07 read
+the gap as "Eurostat publishes it for 536 NUTS3 units", which was the selection
+rule and not the publisher. The rule is now: walking back from the newest year,
+take the first one that covers at least 90 % of the regions the year before it
+covers. A rebuild reads GDP from **2023 for 1,292 regions**.
+
+The rule is compared with the year before, not with the best year ever, because
+older years carry codes from earlier NUTS vintages and the United Kingdom: the
+age cube has 1,589 regions in 2019 and 1,338 in 2025, and a best-year floor sent
+`share_over_65` back to 2019 in the first draft of this change. Caught by the
+proof below and not shipped.
+
+**What did not move.** `share_over_65` and `poverty_rate_pct` (`poverty_rate` in
+the frozen table, which predates the rename; values compared after
+`with_current_names`), and their year and level columns,
+recomputed with the new rule from the same cached cubes are
+**identical** to the columns in the frozen `exposure.parquet`, value for value,
+for all 1,345 regions: both stay on 2025. `exposure.parquet` was not rebuilt.
+
+**The rebuild, diffed against the frozen table.** `scripts/build_context.py
+--stripes 72` on this branch, written to a new file
+(`data/processed/context.eurostat-12-10.parquet`; the frozen `context.parquet`
+is untouched), 43 min, peak 8.8 GB resident. 1,345 rows, 36 columns against 29.
+Column by column against the frozen table: the basin, APSFR and climate columns
+and `built_total_m2` are **identical**; `exposed_built_m2_rp100` and
+`built_share_exposed_rp100` differ in 63 and 60 rows by at most **5.0e-10
+relative** (0.0006 m2), floating-point summation order between two runs of the
+same windowed code, not a change of meaning; `gdp_meur` and `gdp_meur_year`
+differ in 1,292 rows, which is the change above. To adopt it, replace
+`context.parquet` with the new file or rebuild in place.
+
+**And a script bug the rebuild found.** `--out` given as a relative path wrote
+the table and then raised in `relative_to(ROOT)` while printing the summary:
+exit 1, no notes printed. The summary now prints the path as given when it is
+not under the repository; `tests/test_build_context.py` pins it.
+
+Tests (WSL, Python 3.14, no data/): **569 passed before, 577 after** - six in
+`tests/test_demographics.py`, two in the new `tests/test_build_context.py`. The
+per-file table in `technical_deep_dive.md` section 7 was re-measured and three
+stale rows corrected.
+
+## 2026-10-12 — protected nature under the water: the first environmental figure
+
+**NEW COLUMNS in `context.parquet` (context, never exposure).**
+
+- `natura2000_km2` — the area of the UNION of Natura 2000 sites inside the
+  region, km2, end-2024 release (`eea_natura2000_gpkg`).
+- `natura2000_flooded_km2_rp100` — the part of it where the RP100 depth exceeds
+  0.5 m once permanent water and the JRC's spurious-depth areas are removed:
+  the same flooded definition, return period and masks as the built-up columns.
+- `natura2000_flooded_share_rp100` — the second over the first, None where the
+  region holds no protected area (0 % of nothing would rank as safest).
+- `natura2000_grid_coverage` — the share of the region's area that lies on the
+  hazard grid at all.
+
+All four are None for a region in a country with no site in the file (the
+network is EU-27): not measured, not zero.
+
+**Why defined this way.** Article 6(5) of the Floods Directive asks flood risk
+maps to show adverse consequences for the environment; the kit measured people
+and buildings only. An AREA is what the source supports: the GeoPackage gives
+boundaries, not habitat sensitivity, so the column says how much protected land
+is on flood-prone ground and nothing about harm - a floodplain forest is meant
+to flood.
+
+**Why on the hazard grid, and why that does not break the windowing rule.** A
+site is a polygon, not a count on the 1 km population grid. Rasterising it to
+1 km and weighting by each cell's wet share would assume protected and flooded
+ground are independent within a cell, which is false for exactly the riverine
+sites a flood reaches. So `src/environment.py` burns the sites and the regions
+onto the hazard raster's own 3 arc-second grid and intersects them with the wet
+mask cell by cell, with each row's true cell area from the WGS84 ellipsoid. The
+rule "windows on the population grid, never on the hazard raster" exists because
+`Resampling.average` renormalises over a window's source area; nothing is
+resampled here, each hazard cell is read in exactly one full-width row band and
+added to one region, and `tests/test_environment.py` pins the answer at six
+window sizes.
+
+**Measured** (one pass on the real data through `build_context._natura`, the
+function the full build calls, 7 min 20 s, peak 8.6 GB resident; its columns
+were joined onto a copy of the frozen table and written to the new file
+`data/processed/context.natura-12-10.parquet`, so the frozen `context.parquet`
+is untouched and its 29 columns are carried over identical, checked column by
+column): 1,159 regions measured; **769,990 km2** of Natura land in NUTS3
+polygons, of which **38,246 km2 (5.0 %)** is flooded at RP100. Largest flooded
+areas: RO225 (893 km2, 14 %), HU331 (775 km2, 58 %), HR028 (732 km2, 45 %).
+Checked against an exact vector intersection of the dissolved sites with five
+regions (BE341, DE21H, HU110, NL230, RO213): grid and vector agree within 0.3 %.
+Thirteen EU regions hold no Natura land; the five French outermost regions
+(FRY10-50) and the Azores (PT200) lie off the hazard grid; ES703 is measured on
+13 % of its area and ES705 on 92 %.
+
+**Source.** 1,360,171,008 B, SHA-256
+`fc947b015a71e87be1cec3d255ba6f0c41dc434649984476beed88e537964f42`, CC-BY-4.0,
+fetched through `src.fetch` on 2026-10-12. The file writes Greece `GR` where
+GISCO writes `EL`; the country match maps one to the other.
+
+**Not built: CORINE Land Cover.** The status layer still needs a CLMS account,
+and no land-cover figure has been designed. An anonymous CLC 2018 *accounting*
+layer exists on the EEA datashare (215 MB); taking a variant built for change
+accounting is a choice left to a human.
+
+Tests (WSL, Python 3.14, no data/): **569 passed before, 586 after** -
+seventeen in the new `tests/test_environment.py`.
+
+## 2026-10-12 — the ensemble could not have grown past one simulation, and now reports its quartiles
+
+**What was wrong, measured before it mattered.** `ensemble_change_by_region`
+labelled each member by hydrological model, GCM and realisation, and not by
+regional model. The dataset drives three regional models from the same EC-EARTH
+r12i1p1 run (CCLM4-8-17, RACMO22E, RCA4), so the three got one label and each
+silently overwrote the last. Measured on a synthetic region whose three members
+read +10 %, +20 % and +30 %: `origin/main` reports **1 member and a median of
++30 %**, this branch **3 members and +20 %**. Nothing on disk triggered it - the
+archive holds one simulation through two models - but the first CDS download of
+a second regional model would have, with no error. The label now carries the
+regional model, and two files describing the same simulation are refused rather
+than counted as two opinions.
+
+The fetcher had the same blind spot: "already on disk" matched the model and the
+period only, so HadGEM2-ES/RCA4 through E-HYPEgrid would have been skipped because
+EC-EARTH/CCLM through E-HYPEgrid was present, and `check` never compared the GCM
+or the regional model of a downloaded file with the request.
+
+**NEW COLUMNS — `change_pct_ensemble_p25_<period>`, `change_pct_ensemble_p75_<period>`.**
+The quartiles (linear interpolation) of the members' regional medians. With
+sixteen members the range is two models' outliers, and the interquartile range
+is the interval to quote; with the two members on disk today the quartiles sit a
+quarter of the way in from each end of the range and say nothing the range does
+not. `ensemble_agrees_on_sign` keeps its meaning - every member points the same
+way, and one member is never agreement - and `change_pct_ensemble_min/max` are
+unchanged. No existing column moves: `context.parquet` was not rebuilt on this
+branch, because there is no new member to add.
+
+**What the fetcher does now.** `scripts/fetch_cds_member.py` knows the eight
+simulations the constraints file offers for both gridded models under RCP 8.5,
+and `--all-missing` plans one request per (simulation, model, period): 48 in all,
+**42 missing** against the archive today. Every file is checked on all five
+identifying fields in a staging directory before anything is moved.
+
+**Not fetched.** `.env` declares no CDS variable and no key was available, so the
+download is tested with a mocked client only. To run it: create a CDS account,
+accept the dataset licence on its download page, `pip install cdsapi`, put the
+key in `~/.cdsapirc` (or `CDSAPI_URL` + `CDSAPI_KEY`), then
+`python scripts/fetch_cds_member.py --all-missing` and
+`python scripts/build_context.py --stripes 72`.
+
+Tests (WSL, Python 3.14, no data/): **569 passed before, 579 after** - ten new
+tests in `tests/test_climate.py`, all offline, the CDS client mocked.
+
+## 2026-10-12 — the three data layers on one context table
+
+The Eurostat, Natura 2000 and CDS-ensemble branches are merged onto `main` as it
+stood after the units rename, and `scripts/build_context.py --stripes 72` was
+run once on the merged tree, to the NEW file
+`data/processed/context.data-layers-12-10.parquet` (47 min, peak 9.0 GB
+resident). The frozen `context.parquet` and `exposure.parquet` are untouched.
+
+**The table.** 1,345 rows, 46 columns: the 29 of the frozen table, the seven
+density and income columns, the four Natura 2000 columns, and
+`change_pct_ensemble_p25/p75` for each of the three periods.
+
+**What moved, column by column against the frozen table.** Basins, APSFR,
+`built_total_m2` and every existing climate column are identical.
+`exposed_built_m2_rp100` and `built_share_exposed_rp100` differ in 63 and 60
+rows by at most 5.0e-10 relative (summation order). `gdp_meur` and
+`gdp_meur_year` differ in 1,292 rows: the documented year change above (2023,
+1,292 regions). Nothing else. The Natura 2000 columns are identical to the
+single-branch pass, and the density, income and GDP columns to the
+single-branch rebuild.
+
+**Read without change.** `/api/context` serves all 46 columns (checked through
+the FastAPI test client on the new file: BE332 reads 45.0 km2 of Natura land,
+808.5 persons per km2, 21,300 PPS, GDP 2023), so the MCP `profile_regions` tool,
+which flattens that route, carries them too. `/api/meta` still offers exactly
+`exposed_pop`, `share_over_65` and `poverty_rate_pct` as indicators: nothing new
+reaches the vulnerability index. The Streamlit context tab shows the quartiles
+in its climate table and does not yet show density, income or Natura.
+
+**To adopt it**, from the repository root (PowerShell), keeping the old table:
+
+    Copy-Item data\processed\context.parquet data\processed\context.parquet.backup-20261012
+    Copy-Item data\processed\context.data-layers-12-10.parquet data\processed\context.parquet
+
+Tests (WSL, Python 3.14, no `data/`): **650 on `main`, 685 after the merge**.

@@ -82,10 +82,10 @@ directory listing is valid HTML comfortably above the minimum document size — 
 source permanently done. A silent success, repeated on every later run, with no
 data in it. `expand()` is the fix: an entry's `files:` list becomes one job per
 file, ids become `<entry id>/<file stem>`, and the count `fetch_all` prints is
-the number of jobs (49 for `geodata`, of which 37 are files to download at
-≈3.78 GiB and 12 are runtime API calls; 76 jobs and 64 files at ≈3.82 GiB across
+the number of jobs (52 for `geodata`, of which 38 are files to download at
+≈5.05 GiB and 14 are runtime API calls; 79 jobs and 65 files at ≈5.09 GiB across
 all three sections, derived from `sources.yaml` on 12 October 2026) rather than of
-declared entries, of which there are 54. Entries with no `files:` key pass through untouched, so every
+declared entries, of which there are 57. Entries with no `files:` key pass through untouched, so every
 single-file source keeps its previous on-disk path.
 
 ## Verification is not an LLM call

@@ -424,9 +424,10 @@ geodata:
       and nothing else. A protected site in a flood zone is a consequence the
       Directive names and the kit cannot yet count.
     caveat: >
-      DECLARED, NOT YET USED. No module reads this: it is recorded here so the
-      gap against Article 6(5) is traceable rather than silent. Do not cite a
-      figure from it until something computes one.
+      The SERVICE is not read by any module: the figures come from the same
+      release downloaded whole as eea_natura2000_gpkg below, which this
+      service's own description names as its source. Kept for provenance and
+      for a live map layer.
       Verified 2026-10-07: the service answers anonymously and layer 0 holds
       23,799 Habitats Directive sites (pSCI, SCI or SAC); layer 1 is the Birds
       Directive sites (SPA) and layer 2 is both together. Choosing among the
@@ -437,6 +438,31 @@ geodata:
       the same need for `maxAllowableOffset`; see `src/apsfr.py` for the measured
       cost of getting that tolerance wrong.
     verified: 2026-10-07
+
+  - id: eea_natura2000_gpkg
+    url: https://sdi.eea.europa.eu/datashare/public.php/dav/files/sptXqwkQr5g7Bp5/eea_v_3035_100_k_natura2000_p_2024_v01_r00/Natura2000_end2024.gpkg
+    landing: https://sdi.eea.europa.eu/catalogue/srv/api/records/91357f39-7866-41ce-b447-43905c364ec8
+    access: download
+    crs: EPSG:3035
+    purpose: >
+      Natura 2000 (vector), version end 2024: the boundaries of every site
+      designated under the Habitats and Birds Directives, as one GeoPackage, the
+      release the eea_natura2000_sites service above says it serves. Downloaded
+      rather than paged out of that service because the file is the reference
+      release in EPSG:3035, one request instead of thousands, and identical on
+      every run. src/environment.py reads it for the flooded protected area per
+      NUTS3 in context.parquet.
+    caveat: >
+      1,360,171,008 B, measured 2026-10-12 from the Content-Length of the EEA
+      datashare (a Nextcloud public share; this url is its anonymous WebDAV
+      path). EU-27 only: a region in a non-EU country has no Natura figure, not a
+      zero. A site designated under both directives appears once, but two
+      different sites can overlap on the ground, so areas are measured on the
+      UNION of the polygons, never as a sum of site areas. The EEA states that
+      only the Member States' own data is authentic.
+    doi: 10.2909/91357f39-7866-41ce-b447-43905c364ec8
+    licence: CC-BY-4.0
+    verified: 2026-10-12
 
   - id: copernicus_corine_land_cover
     url: https://land.copernicus.eu/en/products/corine-land-cover
@@ -529,14 +555,19 @@ geodata:
       NO LONGER SUPPORTED by the data providers (notice dated 2025-01-29): the
       data and documentation stand as they are, and nobody is fixing them. Say so
       rather than letting a juror find it.
-      Fetched BY HAND through the CDS download form, not by any code here: the
-      form is where a request's cost is checked against the cap below, and where
-      the exact variable, experiment and period identifiers come from. Put the
-      resulting `.nc` files in `data/raw/download/cds_hydrology_projections/`,
-      which is what `src/climate.py` reads; it needs no credential and there is
-      no `CDS_API_KEY`. A free CDS account is needed to use the form - create it
-      early, and note that `src.fetch` and the offline readiness check know
-      nothing about these files. The CDS Terms of Use change on 28 October 2026 - the day
+      The two members on disk were fetched BY HAND through the CDS download form.
+      The rest are requested by scripts/fetch_cds_member.py (`--all-missing`),
+      one simulation, one model and one period per request so each stays under
+      the cost cap below and each file can be checked against what was asked.
+      That script needs a free CDS account, the dataset's licence accepted on
+      its download page, `pip install cdsapi`, and the key in ~/.cdsapirc or
+      CDSAPI_KEY; `src/climate.py`, which reads the `.nc` files in
+      `data/raw/download/cds_hydrology_projections/`, needs no credential.
+      `src.fetch` and the offline readiness check know nothing about these
+      files. Eight simulations offered for the gridded models under RCP 8.5,
+      read off the constraints file 2026-10-12: EC-EARTH r12i1p1 with CCLM4-8-17,
+      RACMO22E and RCA4; HadGEM2-ES r1i1p1 with RACMO22E and RCA4; MPI-ESM-LR
+      with REMO2009 (r1i1p1 and r2i1p1) and RCA4 (r1i1p1). The CDS Terms of Use change on 28 October 2026 - the day
       before the event - and continued use after that date is acceptance.
       Requests are COST-CAPPED at 1000, and the cost is the product of the boxes
       ticked, not their sum: the form's own default selection (11 variables x 10
@@ -688,6 +719,43 @@ geodata:
       dropped. Pin the unit: MIO_EUR, MIO_PPS and EUR_HAB are three different
       numbers and mixing them is silent.
     verified: 2026-10-06
+
+  - id: eurostat_population_density
+    url: https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/demo_r_d3dens
+    access: api
+    purpose: >
+      Population density, persons per km2, by NUTS3 (unit PER_KM2). Context in
+      context.parquet, not a vulnerability indicator: it says how concentrated a
+      region's people are, which qualifies an exposure count without making any
+      resident more vulnerable. Read by src/demographics.py::population_density.
+    caveat: >
+      Open API, no credentials. Checked live 2026-10-12: BE332 returns 808.5 for
+      2024, updated 2026-02-25. The 2024 values sit on the NUTS 2021 codes, so 66
+      of the 1,345 NUTS 2024 regions have no figure - among them the eight new
+      Belgian codes (BE224, BE225, BE328-BE32D), five Sardinian ones (ITG2D-H),
+      six Croatian, two Estonian, all of Serbia and Kosovo and most of Norway. A
+      blank is a vintage mismatch, not an empty region. Flags "p" and "e" travel
+      in pop_density_flag.
+    licence: CC-BY-4.0
+    verified: 2026-10-12
+
+  - id: eurostat_household_income
+    url: https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nama_10r_2hhinc
+    access: api
+    purpose: >
+      Net disposable income of private households per inhabitant, in purchasing
+      power standards (na_item B6N, direct BAL, unit PPS_EU27_2020_HAB), by NUTS2.
+      Context in context.parquet. Read by src/demographics.py::household_income.
+    caveat: >
+      Open API, no credentials. NUTS2 only, applied to each NUTS3 child, and the
+      column household_income_level says so. One dataset code, five units
+      (MIO_EUR, EUR_HAB, MIO_NAC, MIO_PPS_EU27_2020, PPS_EU27_2020_HAB) and
+      thirteen national-accounts items: pin all three dimensions. Checked live
+      2026-10-12: BE33 returns 21,300 PPS for 2023 (2024 published for 63 of 296
+      NUTS2 regions only, so 2023 is the vintage), updated 2026-05-20. EU-27 only:
+      no figure for TR, CH, RS, NO, AL, MK, XK, IS, LI, ME.
+    licence: CC-BY-4.0
+    verified: 2026-10-12
 
   - id: cems_emsr517_germany_2021
     url: https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/EMSR517/

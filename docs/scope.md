@@ -84,15 +84,23 @@ harmonised source:
 | Population by age | `demo_r_pjangrp3` | NUTS3 | Declared in `sources.yaml`; checked live 2026-10-06 (BE332 total = 637,220) |
 | At-risk-of-poverty rate | `ilc_li41` | NUTS2 | Declared in `sources.yaml`; checked live 2026-10-06 (BE33 = 14.6) |
 | GDP | `nama_10r_3gdp` | NUTS3 | Declared in `sources.yaml`; checked live 2026-10-06 (BE332 = 26,435.29 MIO_EUR, flagged provisional) |
-| Population density | `demo_r_d3dens` | NUTS3 | Candidate, not yet declared or checked |
-| Disposable household income | `nama_10r_2hhinc` | NUTS2 | Candidate, not yet declared or checked |
+| Population density | `demo_r_d3dens` | NUTS3 | Declared and read; checked live 2026-10-12 (BE332 = 808.5 per km2, 2024). In `context.parquet` |
+| Disposable household income | `nama_10r_2hhinc` | NUTS2 | Declared and read; checked live 2026-10-12 (BE33 = 21,300 PPS per inhabitant, 2023). In `context.parquet` |
 
-The first three are the ones a figure can be built on today — and on the GDP
-endpoint, **pin the unit**: `MIO_EUR`, `MIO_PPS` and `EUR_HAB` are three
-different numbers, mixing them is silent, and recent years carry a provisional
-flag that has to be read rather than dropped. The last two are plausible codes
-that nothing in this repo has called yet, so treat their level column as an
-expectation rather than a fact until one of them returns data.
+On the GDP endpoint, **pin the unit**: `MIO_EUR`, `MIO_PPS` and `EUR_HAB` are
+three different numbers, mixing them is silent, and recent years carry a
+provisional flag that has to be read rather than dropped. The income cube is
+worse - five units and thirteen national-accounts items under one code - so
+`src/demographics.py` pins `B6N`, `BAL` and `PPS_EU27_2020_HAB`, and the unit is
+in the column name. Density and income are **context, not indicators**: they
+qualify a region without making a resident more vulnerable, so they live in
+`context.parquet` where the index cannot scan them, and adding either to the
+index is a weighting decision for a human.
+
+Each column is read from ONE year: the newest one Eurostat has substantially
+published (at least 90 % of the regions the year before it covers). The newest
+year with any value is often a fraction of the map - GDP 2024 covers 536 NUTS3
+regions, 2023 covers 1,307.
 
 Income and poverty are published at NUTS2, not NUTS3. So a vulnerability index
 mixing both levels must **say** that the income component is NUTS2 applied to its
@@ -105,10 +113,10 @@ which is open and needs no credentials.
 
 The JRC maps already cover Europe — that is what they are. Nine return periods,
 272–350 MB each, measured 2026-10-06. Downloading all nine is **2.61 GiB**, and
-the whole `geodata` section — 27 entries, 49 jobs once the multi-file ones are
-expanded, 37 of them files to download and 12 of them runtime API calls — is
-**≈3.78 GiB**, and the full fetch including the policy corpus (24) and context (3)
-is **64 files** and **≈3.82 GiB**: one evening before the 25th, and
+the whole `geodata` section — 30 entries, 52 jobs once the multi-file ones are
+expanded, 38 of them files to download and 14 of them runtime API calls — is
+**≈5.05 GiB**, and the full fetch including the policy corpus (24) and context (3)
+is **65 files** and **≈5.09 GiB**: one evening before the 25th, and
 nothing on the day. The counts come from `src.fetch.expand()` over
 `sources.yaml` as it stood on 12 October 2026, the bytes from the hosts'
 `Content-Length` on 6 October (the documents added on the 12th mostly send

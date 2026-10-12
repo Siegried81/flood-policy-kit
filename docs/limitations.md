@@ -99,7 +99,9 @@ rebuilt. The findings and recommendations themselves are in
   offers eight simulations; on disk every file is `ICHEC-EC-EARTH r12i1p1`
   under RCP 8.5 through E-HYPEgrid and VIC-WUR. The ensemble agrees on the sign
   in 976, 994 and 943 of 1,345 regions for the three horizons, and one member
-  never counts as agreement with itself. Regions where the two chains disagree
+  never counts as agreement with itself. The other seven simulations are
+  fetched by `scripts/fetch_cds_member.py --all-missing` once a CDS key exists
+  (see "Built after the freeze" in §2). Regions where the two chains disagree
   keep their colour on the map and are hatched, which is a third statement:
   measured, direction unsupported.
   [`datasets.md`](datasets.md#copernicus-cds--hydrology-projections--verified--and-unsupported),
@@ -148,9 +150,6 @@ rebuilt. The findings and recommendations themselves are in
 - **Reported events are a probe, never evidence.** News coverage is biased by
   attention, language and population; nothing from `src/events.py` enters a
   ranking or a headline. [`src/events.py`](../src/events.py) module docstring.
-- **Environment and cultural heritage are not measured.** Article 6(5) asks
-  flood risk maps to show both; the kit measures residents and built-up surface
-  only. [`datasets.md`](datasets.md#declared-and-not-yet-used-natura-2000-corine-land-cover).
 
 **The map and the text**
 
@@ -179,17 +178,10 @@ rebuilt. The findings and recommendations themselves are in
 Each item names where its design lives, so that finishing it starts from a
 written intent rather than from memory.
 
-- **Environment and heritage layers.** Natura 2000 and CORINE Land Cover are
-  declared in `config/sources.yaml` with `DECLARED, NOT YET USED` in their
-  caveat; no module reads either, and no figure may be quoted from them until
-  one does. Design: [`datasets.md`](datasets.md#declared-and-not-yet-used-natura-2000-corine-land-cover).
-- **Two further Eurostat indicators.** Population density (`demo_r_d3dens`) and
-  disposable household income (`nama_10r_2hhinc`) are named as candidates and
-  not yet declared or called. Design: [`scope.md`](scope.md#demographics-eurostat-not-statbel).
-- **The full CDS ensemble.** Two of the eight offered simulations are on disk;
-  `scripts/fetch_cds_member.py` fetches one member at a time and verifies the
-  filename against the request. Design: [`datasets.md`](datasets.md#copernicus-cds--hydrology-projections--verified--and-unsupported),
-  [`scripts/fetch_cds_member.py`](../scripts/fetch_cds_member.py).
+- **Land cover and cultural heritage.** Natura 2000 is built (below); CORINE
+  Land Cover is declared with `DECLARED, NOT YET USED` in its caveat, needs a
+  CLMS account for the status layer, and has no figure designed yet; no heritage
+  source is declared at all. Design: [`datasets.md`](datasets.md#environment-natura-2000-measured-corine-land-cover-not-yet).
 - **Depth-against-depth validation.** Blocked on a re-minted download URL for
   the Walloon IDW depth layer. Design: [`datasets.md`](datasets.md#wallonia-observed-july-2021--the-second-ground-truth--one-layer-verified-one-dead).
 - **The model-versus-observation map for Europe.** The satellite-derived flood
@@ -237,6 +229,41 @@ written intent rather than from memory.
   before the rename keep the old header. `share_over_65` keeps its name:
   "share" already says fraction.
   [`decisions.md`, 2026-10-12](decisions.md#2026-10-12--the-poverty-rate-says-it-is-a-percentage-in-its-name).
+- **Population density and household income** (2026-10-12). Context, and one
+  of them is NUTS2.
+  `pop_density_per_km2` (`demo_r_d3dens`, 2024) and
+  `household_income_pps_per_hab` (`nama_10r_2hhinc`, net disposable income in
+  PPS per inhabitant, 2023) sit in `context.parquet`, outside the index; adding
+  either to it is a weighting decision. Income is NUTS2 applied to its NUTS3
+  children and covers the EU-27 only (1,165 of 1,345 regions); density is
+  published on NUTS 2021 codes and leaves 66 NUTS 2024 regions blank.
+  [`src/demographics.py`](../src/demographics.py) `context_indicators`.
+  `gdp_meur` is read from the newest substantially published year since the
+  same day (2023, 1,292 regions).
+  [`decisions.md`, 2026-10-12](decisions.md#2026-10-12--density-and-household-income-reach-the-context-table-and-gdp-reads-a-year-that-covers-the-map).
+- **Natura 2000 on flood-prone ground** (2026-10-12). Measured as area, and
+  only in the EU-27. Article 6(5) asks flood risk maps to show the consequences for the environment and for
+  cultural heritage. Since 2026-10-12 `context.parquet` carries the Natura 2000
+  area on flood-prone ground (RP100, >= 0.5 m, masked like the exposure table):
+  38,246 km2 of 769,990 km2 of Natura land, 5.0 %. It is an area, not a harm -
+  a floodplain forest is meant to flood - and it says nothing about which
+  habitat. Regions outside the EU-27 have no figure, five French outermost
+  regions and the Azores lie off the hazard grid, and the Canaries' ES703 is
+  measured on 13 % of its area (`natura2000_grid_coverage`). Land cover
+  (CORINE) and cultural heritage are still not measured (§2).
+  [`src/environment.py`](../src/environment.py),
+  [`datasets.md`](datasets.md#environment-natura-2000-measured-corine-land-cover-not-yet).
+- **The full CDS ensemble: the code** (2026-10-12), **not the data.**
+  `scripts/fetch_cds_member.py --all-missing` requests every one of the eight
+  simulations through both gridded models for the three periods (48 requests,
+  42 of them missing today, one member each) and verifies the GCM, the regional
+  model, the realisation, the model and the period of every file before it
+  enters the ensemble directory; the ensemble reports the quartiles of its
+  members' medians. It is tested with a mocked CDS client only: no CDS key
+  exists on the development machine, so the archive is still the one simulation
+  described in §1 until someone runs it with one.
+  [`scripts/fetch_cds_member.py`](../scripts/fetch_cds_member.py),
+  [`decisions.md`, 2026-10-12](decisions.md#2026-10-12--the-ensemble-could-not-have-grown-past-one-simulation-and-now-reports-its-quartiles).
 
 ## 3. What a Member State or the Commission would still have to do
 
@@ -287,7 +314,7 @@ here, still needs the following from the authority itself.
 Only what the repository shows.
 
 - **The data is not committed.** `data/` is ignored; a fresh clone has to fetch
-  about 3.8 GiB and run a multi-hour continental build before the API answers
+  about 5.1 GiB and run a multi-hour continental build before the API answers
   anything but 404. CI therefore runs with no data, and a test that strays
   outside the frozen harness passes locally and fails on the runner.
   [`.gitignore`](../.gitignore), [`scope.md`](scope.md#what-the-nuts3-choice-produces-on-disk),
@@ -300,7 +327,7 @@ Only what the repository shows.
   pulled, so a container started without `.env` asks for the same name. The
   check skips every `access: api` source, so the Risk Data Hub is covered only
   through its cache check, and the basin districts and the CDS files through
-  their own WARN checks. Since 2026-10-12, 64 files are declared: the twelve
+  their own WARN checks. Since 2026-10-12, 65 files are declared: the twelve
   policy documents added that day are missing until the next fetch, and the
   arXiv paper is now expected as `nist_robust_ai_alignment_limits.pdf`, so the
   check stays BLOCKED until `python -m src.fetch` has run once more.
@@ -313,11 +340,11 @@ Only what the repository shows.
   feature. [`decisions.md`, 2026-10-08 "the draft tab could never have worked"](decisions.md#2026-10-08--the-draft-tab-could-never-have-worked-for-three-reasons),
   [`decisions.md`, 2026-10-08 "there was no map"](decisions.md#2026-10-08--the-first-scored-deliverable-was-missing-there-was-no-map),
   [`requirements.txt`](../requirements.txt).
-- **Test counts are typed by hand.** The per-file table in
-  `technical_deep_dive.md` §7 lists 22 files summing to 473 and omits
-  `tests/test_svgmap.py`; `pytest --collect-only` on 2026-10-08 collects 513
-  across 23 files. The total in the same section is right and the rows are
-  stale. [`technical_deep_dive.md` §7](technical_deep_dive.md#7-the-test-suite).
+- **Per-file test counts are typed by hand.** The total in
+  `technical_deep_dive.md` §7 is filled by `scripts/docs_numbers.py`; the
+  per-file rows are not, and they drift: the table of 10 October had three
+  wrong or missing rows by 12 October. Re-measured that day on the merged tree (29 files, summing
+  to the total); re-measure again after any test change. [`technical_deep_dive.md` §7](technical_deep_dive.md#7-the-test-suite).
 - **Whether the suite runs on Windows depends on a policy that flipped twice.**
   Smart App Control blocked `rasterio`'s DLL on 2026-10-07 and allowed it again
   the next morning with nothing reinstalled; the WSL2 venv is the route that

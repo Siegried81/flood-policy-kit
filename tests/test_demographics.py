@@ -326,3 +326,104 @@ def test_a_table_frozen_before_the_rename_loads_under_the_current_names():
 def test_a_table_with_both_names_is_left_for_a_human():
     both = pd.DataFrame({"poverty_rate": [14.6], "poverty_rate_pct": [14.6]})
     assert list(demographics.with_current_names(both).columns) == ["poverty_rate", "poverty_rate_pct"]
+
+
+# --- the year a column is read from ---------------------------------------------
+
+def test_a_thinly_published_newest_year_is_not_the_vintage(monkeypatch):
+    """Eurostat releases a year country by country. Measured on `nama_10r_3gdp`:
+    1,307 regions in 2023 and 536 in 2024, and "the newest year with any value"
+    left GDP blank for the regions only 2023 covers. Here 2025 carries one region
+    of ten, so the column must come from 2024."""
+    geos = [f"BE{i:03d}" for i in range(10)]
+    times = ["2024", "2025"]
+    values = {str(g * 2): 100.0 + g for g in range(10)}
+    values["1"] = 999.0  # 2025, first region only
+    cube = _cube(["geo", "time"], [10, 2], [geos, times], values)
+    monkeypatch.setattr(demographics, "fetch", lambda *a, **k: cube)
+
+    out = demographics.gdp_meur()
+    assert set(out["gdp_meur_year"]) == {"2024"}
+    assert len(out) == 10
+    assert out.loc["BE000", "gdp_meur"] == pytest.approx(100.0)
+
+
+def test_a_newest_year_that_is_nearly_complete_is_taken():
+    """The coverage floor is a floor, not a preference for older data: a year
+    missing one region of twenty is the vintage."""
+    frame = pd.DataFrame({
+        "geo": [f"R{i}" for i in range(20)] * 2,
+        "time": ["2024"] * 20 + ["2025"] * 20,
+        "value": [1.0] * 20 + [2.0] * 19 + [None],
+    })
+    _, year = demographics._latest(frame)
+    assert year == "2025"
+
+
+def test_status_flags_land_on_the_cell_they_belong_to():
+    """Flags are a second sparse dict keyed by the same flat offsets. A flag
+    shifted by one cell would mark the wrong region provisional."""
+    cube = _cube(["geo", "time"], [3, 1], [["A", "B", "C"], ["2024"]],
+                 {"0": 1.0, "1": 2.0, "2": 3.0})
+    cube["status"] = {"1": "p"}
+    frame = demographics.tidy(cube, with_status=True).set_index("geo")["status"]
+    assert frame["B"] == "p"
+    assert pd.isna(frame["A"]) and pd.isna(frame["C"])
+    assert "status" not in demographics.tidy(cube).columns
+
+
+# --- density and household income: context, never an indicator ------------------
+
+def _context_cubes():
+    density = _cube(["geo", "time"], [2, 1], [["BE332", "BE211"], ["2024"]],
+                    {"0": 808.5, "1": 1100.0})
+    density["status"] = {"0": "p"}
+    income = _cube(["geo", "time"], [2, 1], [["BE33", "BE21"], ["2023"]],
+                   {"0": 21300.0, "1": 25400.0})
+    return {"demo_r_d3dens": density, "nama_10r_2hhinc": income}
+
+
+def test_density_and_income_pin_the_unit_they_are_named_after(monkeypatch):
+    """`nama_10r_2hhinc` carries five units and thirteen national-accounts items
+    under one code; the API's default is not a choice anyone made."""
+    asked = {}
+    cubes = _context_cubes()
+
+    def stub(dataset, **params):
+        asked[dataset] = params
+        return cubes[dataset]
+
+    monkeypatch.setattr(demographics, "fetch", stub)
+    demographics.context_indicators(["BE332"])
+    assert asked["demo_r_d3dens"]["unit"] == "PER_KM2"
+    assert asked["nama_10r_2hhinc"]["unit"] == "PPS_EU27_2020_HAB"
+    assert asked["nama_10r_2hhinc"]["na_item"] == "B6N"
+    assert asked["nama_10r_2hhinc"]["direct"] == "BAL"
+
+
+def test_income_is_a_nuts2_figure_and_says_so(monkeypatch):
+    cubes = _context_cubes()
+    monkeypatch.setattr(demographics, "fetch", lambda dataset, **k: cubes[dataset])
+
+    out = demographics.context_indicators(["BE332", "BE213", "FR101"])
+    assert out.loc["BE332", "pop_density_per_km2"] == pytest.approx(808.5)
+    assert out.loc["BE332", "pop_density_flag"] == "p"
+    assert out.loc["BE332", "household_income_pps_per_hab"] == pytest.approx(21300.0)
+    assert out.loc["BE213", "household_income_pps_per_hab"] == pytest.approx(25400.0)
+    assert "NUTS2" in out.loc["BE332", "household_income_level"]
+    # Not published: missing, never borrowed from a neighbour or set to zero.
+    assert pd.isna(out.loc["FR101", "pop_density_per_km2"])
+    assert pd.isna(out.loc["FR101", "household_income_pps_per_hab"])
+    assert pd.isna(out.loc["BE213", "pop_density_per_km2"])
+
+
+def test_only_the_two_figures_are_numeric(monkeypatch):
+    """Vintages, flags and levels are text, so a scan for numeric columns - the
+    way `api/main.py` picks indicators - finds the two figures and nothing else.
+    They belong in `context.parquet`; this keeps them harmless even if copied."""
+    cubes = _context_cubes()
+    monkeypatch.setattr(demographics, "fetch", lambda dataset, **k: cubes[dataset])
+
+    out = demographics.context_indicators(["BE332"])
+    numeric = [c for c in out.columns if out[c].dtype.kind in "if"]
+    assert numeric == ["pop_density_per_km2", "household_income_pps_per_hab"]

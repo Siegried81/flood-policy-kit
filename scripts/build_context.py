@@ -1,11 +1,14 @@
 """Freeze the per-region context table: data/processed/context.parquet.
 
 One row per region, holding what `exposure.parquet` deliberately does not: the
-built-up surface in the way of the water, how much of a region drains into a
-basin it shares with another country, and how the flood discharge moves under a
-climate scenario. `src/assets.py`, `src/basins.py` and `src/climate.py` compute
-these; this script is what turns them into something both UIs and the brief can
-read.
+built-up surface in the way of the water, the protected Natura 2000 area under
+it, how much of a region drains into a basin it shares with another country, how
+the flood discharge moves under a climate scenario, and the Eurostat
+denominators that qualify a region without describing its residents'
+vulnerability (GDP, population density, household income). `src/assets.py`,
+`src/environment.py`, `src/basins.py`, `src/climate.py` and
+`src/demographics.py` compute these; this script is what turns them into
+something both UIs and the brief can read.
 
 **A second table, not more columns on the first.** Two reasons, and the second
 is the load-bearing one.
@@ -48,13 +51,14 @@ sys.path.insert(0, str(ROOT))
 from scripts.build_exposure import (  # noqa: E402
     DEFAULT_MIN_DEPTH_M,
     DEFAULT_STRIPES,
+    HAZARD_DIR,
     PERMANENT_WATER,
     SPURIOUS_AREAS,
     _exposure_one_period,
     boundaries,
     hazard_paths,
 )
-from src import apsfr, assets, basins, climate, demographics  # noqa: E402
+from src import apsfr, assets, basins, climate, demographics, environment  # noqa: E402
 
 OUT = ROOT / "data" / "processed" / "context.parquet"
 CLIMATE_DIR = ROOT / "data" / "raw" / "download" / "cds_hydrology_projections"
@@ -109,6 +113,28 @@ def _built(admin: gpd.GeoDataFrame, return_period: int, min_depth_m: float,
     frame[f"built_share_exposed_rp{return_period}"] = observed.divide(
         denominator.where(denominator > 0)
     ).clip(upper=1.0)
+    return frame, None
+
+
+def _natura(admin: gpd.GeoDataFrame, return_period: int, min_depth_m: float):
+    """Natura 2000 area on flood-prone ground, or a reason it is absent.
+
+    Same return period, same depth threshold and same two masks as the built-up
+    figures, so "flooded" means one thing across the table. Measured on the
+    hazard grid itself - see `src/environment.py` for why that is exact here
+    while the population figures must be windowed on the population grid.
+    """
+    periods = hazard_paths()
+    if return_period not in periods:
+        return None, f"no hazard raster for RP{return_period}; have {sorted(periods)}"
+    try:
+        frame = environment.natura_by_region(
+            periods[return_period], admin,
+            return_period=return_period, min_depth_m=min_depth_m,
+            masks=[str(HAZARD_DIR / PERMANENT_WATER), str(HAZARD_DIR / SPURIOUS_AREAS)],
+        )
+    except environment.NaturaUnavailable as exc:
+        return None, str(exc)
     return frame, None
 
 
@@ -204,6 +230,18 @@ def main() -> int:
             f"({PERMANENT_WATER}, {SPURIOUS_AREAS})"
         )
 
+    natura, why = _natura(admin, args.return_period, args.min_depth_m)
+    if natura is None:
+        notes.append(f"natura 2000: SKIPPED - {why}")
+    else:
+        table = table.join(natura)
+        notes.append(
+            f"natura 2000: RP{args.return_period} at >= {args.min_depth_m} m on the "
+            f"hazard grid, masked like the exposure table; "
+            f"{int(natura['natura2000_km2'].notna().sum())} of {len(admin)} units "
+            "in a country the network covers"
+        )
+
     shared, why = _basins(admin)
     if shared is None:
         notes.append(f"basins: SKIPPED - {why}")
@@ -235,8 +273,9 @@ def main() -> int:
     # one the moment it appeared on an exposure row. So it lives here, where it
     # turns an absolute loss into a share of regional wealth - the comparison a
     # European brief needs, because 100 MEUR means different things in Hainaut
-    # and in Oberbayern. Eurostat publishes it for fewer NUTS3 units than it
-    # publishes population for, and a missing unit stays missing.
+    # and in Oberbayern. The year is the newest one Eurostat has substantially
+    # published (`demographics._latest`), and a unit missing from it stays
+    # missing.
     try:
         gdp = demographics.gdp_meur().reindex(admin[key].values)
         gdp.index = admin.index
@@ -248,6 +287,24 @@ def main() -> int:
         )
     except demographics.EurostatUnavailable as exc:
         notes.append(f"gdp: SKIPPED - {exc}")
+
+    # Density and household income qualify a region the way GDP does, and for
+    # the same reason live here: on an exposure row they would be scanned into
+    # the vulnerability index as numeric columns.
+    try:
+        indicators = demographics.context_indicators(admin[key].values)
+        indicators.index = admin.index
+        table = table.join(indicators)
+        notes.append(
+            f"density: {int(indicators['pop_density_per_km2'].notna().sum())} of "
+            f"{len(admin)} units, PER_KM2 "
+            f"{indicators['pop_density_year'].dropna().iloc[0]}; household income: "
+            f"{int(indicators['household_income_pps_per_hab'].notna().sum())} of "
+            f"{len(admin)} units, PPS per inhabitant "
+            f"{indicators['household_income_year'].dropna().iloc[0]} (NUTS2)"
+        )
+    except demographics.EurostatUnavailable as exc:
+        notes.append(f"density and household income: SKIPPED - {exc}")
 
     periods = args.climate_period
     if not periods:
@@ -268,11 +325,24 @@ def main() -> int:
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     table.to_parquet(args.out, index=False)
-    print(f"{len(table)} rows -> {args.out.relative_to(ROOT)} "
+    print(f"{len(table)} rows -> {_shown(args.out)} "
           f"({args.out.stat().st_size:,} B), {len(table.columns)} columns")
     for note in notes:
         print(f"  {note}")
     return 0
+
+
+def _shown(path: Path) -> Path:
+    """`path` relative to the repository when it lies inside it, else as given.
+
+    `--out` is usually typed relative to the working directory, and
+    `relative_to(ROOT)` raises on a relative path - AFTER the table has been
+    written, so the run reported failure, exited 1 and never printed its notes.
+    """
+    try:
+        return path.relative_to(ROOT)
+    except ValueError:
+        return path
 
 
 def _parses(path: Path) -> bool:
