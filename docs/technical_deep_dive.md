@@ -25,8 +25,8 @@ python -m src.fetch          64 files, ≈3.82 GiB, idempotent, robots-aware
 build_exposure.py  build_context.py  build_geometry.py
  hazard ×           built-up, basins,  boundaries →
  population         future discharge,  simplified polygons
- per NUTS3 × RP     GDP, per NUTS3
- + Eurostat
+ per NUTS3 × RP     GDP, density,
+ + Eurostat         income, per NUTS3
    indicators
         │               │              │
         ▼               ▼              ▼
@@ -389,6 +389,8 @@ summed to 473, a figure that had survived three suite changes by being typed.
 | `test_assets.py` | 8 | the built-up surface: the archive, the unit, the share |
 | `test_docs_numbers.py` | 10 | a number typed in a doc that no longer matches the code fails the suite |
 | `test_legislation.py` | 7 | every legal citation has a CELEX and a URL, and `policy_answer.md` cites no article the registry lacks |
+| `test_mcp_server.py` | 12 | the three intent-shaped MCP tools, answered in flat TOON |
+| `test_build_context.py` | 2 | the context build does not fail after writing its table |
 | `test_build_geometry.py` | 5 | the join key, the projection, the simplification |
 | `test_data_io.py` | 3 | the CRS engine is alive |
 

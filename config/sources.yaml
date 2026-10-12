@@ -689,6 +689,43 @@ geodata:
       numbers and mixing them is silent.
     verified: 2026-10-06
 
+  - id: eurostat_population_density
+    url: https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/demo_r_d3dens
+    access: api
+    purpose: >
+      Population density, persons per km2, by NUTS3 (unit PER_KM2). Context in
+      context.parquet, not a vulnerability indicator: it says how concentrated a
+      region's people are, which qualifies an exposure count without making any
+      resident more vulnerable. Read by src/demographics.py::population_density.
+    caveat: >
+      Open API, no credentials. Checked live 2026-10-12: BE332 returns 808.5 for
+      2024, updated 2026-02-25. The 2024 values sit on the NUTS 2021 codes, so 66
+      of the 1,345 NUTS 2024 regions have no figure - among them the eight new
+      Belgian codes (BE224, BE225, BE328-BE32D), five Sardinian ones (ITG2D-H),
+      six Croatian, two Estonian, all of Serbia and Kosovo and most of Norway. A
+      blank is a vintage mismatch, not an empty region. Flags "p" and "e" travel
+      in pop_density_flag.
+    licence: CC-BY-4.0
+    verified: 2026-10-12
+
+  - id: eurostat_household_income
+    url: https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nama_10r_2hhinc
+    access: api
+    purpose: >
+      Net disposable income of private households per inhabitant, in purchasing
+      power standards (na_item B6N, direct BAL, unit PPS_EU27_2020_HAB), by NUTS2.
+      Context in context.parquet. Read by src/demographics.py::household_income.
+    caveat: >
+      Open API, no credentials. NUTS2 only, applied to each NUTS3 child, and the
+      column household_income_level says so. One dataset code, five units
+      (MIO_EUR, EUR_HAB, MIO_NAC, MIO_PPS_EU27_2020, PPS_EU27_2020_HAB) and
+      thirteen national-accounts items: pin all three dimensions. Checked live
+      2026-10-12: BE33 returns 21,300 PPS for 2023 (2024 published for 63 of 296
+      NUTS2 regions only, so 2023 is the vintage), updated 2026-05-20. EU-27 only:
+      no figure for TR, CH, RS, NO, AL, MK, XK, IS, LI, ME.
+    licence: CC-BY-4.0
+    verified: 2026-10-12
+
   - id: cems_emsr517_germany_2021
     url: https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/EMSR517/
     landing: https://mapping.emergency.copernicus.eu/activations/EMSR517/
