@@ -34,13 +34,13 @@ exposure.parquet   context.parquet   regions.geojson
         │               │              │
         └───────────────┴──────┬───────┘
                                ▼
-                 api/main.py           11 JSON routes over src/
+                 api/main.py           12 JSON routes over src/
                        │
         ┌──────────────┴──────────────┐
         ▼                             ▼
    web/ (React)              app/streamlit_app.py
-   5 tabs, SVG choropleth     6 tabs, no map, reads the
-                              parquets directly, no build step
+   5 tabs, SVG choropleth     7 tabs, SVG choropleth, reads
+                              the parquets directly, no build step
 ```
 
 Two properties of this shape are deliberate.
@@ -53,10 +53,10 @@ coupling them would guarantee it happened.
 **Both UIs read the same frozen table.** They cannot disagree about a number,
 because there is only one number - `app/streamlit_app.py` reads the parquet
 directly rather than going through the API, which is why it needs neither the
-server nor `npm`. They do NOT show the same views: React has three tabs
-(Exposure, Vulnerability, Draft) and draws the choropleth inside the first;
-Streamlit has four, adding the AI usage log, and its Exposure tab has no map.
-The React UI is the one to demo.
+server nor `npm`. They do NOT show the same views: React has five tabs
+(Exposure, Context, Vulnerability, Draft, Translation) and draws the choropleth
+inside the first; Streamlit has seven, adding "Ask the table" and the AI usage
+log. The React UI is the one to demo.
 
 ---
 
@@ -248,11 +248,19 @@ Two choices are load-bearing and both fail silently if got wrong:
   twice over: the missing regions, and the colour of every other one, because the
   legend's classes are quantiles over whatever is present.
 
-### 4.3 The eleven routes
+### 4.3 The twelve routes
 
 `/api/health`, `/api/meta`, `/api/exposure`, `/api/context`, `/api/geometry`,
 `/api/vulnerability`, `/api/search`, `/api/draft`, `/api/languages`,
-`/api/translate`, `/api/approve`.
+`/api/translate`, `/api/approve`, `/api/ask`.
+
+`/api/ask` takes either a `question` or a query `spec`. A question costs one
+model call that writes the spec and nothing else; `src/nlquery.py` validates it
+against a whitelist of defined columns and operators and pandas runs it, so the
+answer can hold no figure the frozen table does not. Exactly one return period
+per answer, rows and never aggregates, and the definition of every column used
+travels with the rows. A refused spec is **422** with the rule it broke; no
+reachable model is **502**, and the `spec` form keeps working without one.
 
 `/api/context` serves the second frozen table, and it is a separate route rather
 than extra columns on `/api/exposure` for a reason that is structural:
@@ -317,6 +325,12 @@ policy corpus and refuses rather than inventing; the grounding score is computed
 arithmetically over content words, not asked of a model. A model that marks its
 own homework is not a check.
 
+**Questions about the table are not answered by the model either.**
+`src/nlquery.py` asks it for a JSON query spec in one call, refuses any column
+or operator outside its whitelist, and lets pandas compute the rows. The model
+never writes SQL or code that runs, and a spec that breaks a rule is refused
+rather than retried.
+
 The distinction from an agent is the point, and it is the one `docs/workflow.md`
 argues at length: fixed nodes, fixed order, a bounded number of calls, and a
 human who approves. Nothing here decides to do something that was not written
@@ -326,9 +340,9 @@ down in advance.
 
 ## 7. The test suite
 
-**<!-- numbers:tests_collected -->569<!-- /numbers --> tests, offline**: no network, no model, no key. Measured 11 October 2026 on
-Windows: all <!-- numbers:tests_collected -->569<!-- /numbers --> collect and pass, nothing deselected. Do not quote that as a
-property of the platform — Smart App Control moved to enforcement on 7 October
+**<!-- numbers:tests_collected -->623<!-- /numbers --> tests, offline**: no network, no model, no key. Measured 12 October 2026 in
+WSL2: all <!-- numbers:tests_collected -->623<!-- /numbers --> collect and pass, nothing deselected; the same day Windows
+blocked `rasterio` again. Do not quote either as a property of the platform — Smart App Control moved to enforcement on 7 October
 2026 and refused rasterio's unsigned DLLs, which left 433 collectable and 431
 passing on Windows while WSL2 ran the lot; by the next morning it allowed the
 same wheel again with nothing reinstalled. **The policy moves both ways, so
@@ -343,19 +357,20 @@ block that `scripts/docs_numbers.py --write` fills from `pytest --collect-only`,
 and `tests/test_docs_numbers.py` fails the suite when any marked block in the
 docs disagrees with the repository. Edit the prose, never the digit.
 
-Per-file counts measured 10 October 2026 with
+Per-file counts measured 12 October 2026 with
 `pytest --collect-only -q | grep '::' | cut -d: -f1 | sort | uniq -c`; they sum to the
-marked total above. Twenty-five files — the previous table listed twenty-two and
+marked total above. Twenty-seven files — an earlier table listed twenty-two and
 summed to 473, a figure that had survived three suite changes by being typed.
 
 | File | Tests | Guards |
 |---|---|---|
+| `test_nlquery.py` | 51 | natural-language questions over the table: the spec whitelist, unknown columns and operators refused, one period, nulls counted as not measured, one model call and no retry |
 | `test_offline_readiness.py` | 52 | the demo runs with the Wi-Fi off: the three verdicts, `--strict`, a rejected file is not present, the two caches `src.fetch` does not fill |
 | `test_validate.py` | 50 | the scoring grid, the three metrics, `None` vs `0.0` |
-| `test_api.py` | 48 | the eleven routes, the 404s that name their builder, the JSX guards |
-| `test_streamlit_app.py` | 47 | the fallback UI, the translation tab, the climate and coverage caveats |
+| `test_api.py` | 50 | the routes, the 404s that name their builder, the JSX guards |
+| `test_streamlit_app.py` | 50 | the fallback UI, the translation and ask-the-table tabs, the climate and coverage caveats |
 | `test_fetch.py` | 42 | robots, idempotency, multi-file expansion, a stale rejection page is quarantined, colliding paths are refused |
-| `test_rag.py` | 31 | cite-or-refuse |
+| `test_rag.py` | 35 | cite-or-refuse |
 | `test_losses.py` | 29 | the RDH euro vintages and the levelling |
 | `test_basins.py` | 27 | the shared-basin layer: the declared crosswalk, the sliver floor |
 | `test_exposure.py` | 23 | the two modes, `nodata_means_dry`, the masks, the build checkpoint |
@@ -364,6 +379,7 @@ summed to 473, a figure that had survived three suite changes by being typed.
 | `test_vulnerability.py` | 21 | the composite index, its sensitivity, and what one indicator cannot prove |
 | `test_rdh.py` | 16 | the paged client and its cache |
 | `test_toon_io.py` | 15 | the compact table encoding for prompts, and a tokenizer that cannot fetch its table says so |
+| `test_mcp_server.py` | 12 | the three intent-based MCP tools and their flat TOON answers |
 | `test_apsfr.py` | 13 | the two reporting cycles, the dissolve, the claim it must not make |
 | `test_svgmap.py` | 16 | the offline choropleth: quantile classes, holes kept, the outermost regions out of the extent, hatching where the chains disagree, a legend that names its sixths and stays inside the viewBox |
 | `test_demographics.py` | 12 | the sparse cube, the overlapping age buckets, the NUTS2 caveat |
@@ -388,7 +404,7 @@ zonal statistic is the right arithmetic on the wrong piece of Europe. Measured o
 
 | Claim | Source |
 |---|---|
-| <!-- numbers:tests_collected -->569<!-- /numbers --> tests | `scripts/docs_numbers.py --write`, which runs `pytest --collect-only` and rewrites the marked blocks; the per-file counts are typed by hand |
+| <!-- numbers:tests_collected -->623<!-- /numbers --> tests | `scripts/docs_numbers.py --write`, which runs `pytest --collect-only` and rewrites the marked blocks; the per-file counts are typed by hand |
 | 52 files, ≈3.82 GiB | `src.fetch.expand()` over `config/sources.yaml` |
 | <!-- numbers:sources_declared -->42<!-- /numbers --> declared inputs, <!-- numbers:sources_verified -->34<!-- /numbers --> with a verification date, <!-- numbers:sources_licensed -->11<!-- /numbers --> with an explicit `licence:` | `scripts/docs_numbers.py` over `config/sources.yaml`: entries with an `id`; `verified` not null; `licence` non-empty |
 | 1,345 NUTS3 polygons | the GISCO NUTS 2024 file itself |

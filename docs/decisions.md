@@ -1479,3 +1479,55 @@ completes, the four imports load, and the readiness script with no data says
 Also: the test counts rewritten to 551 on 10 October sat under two sentences
 still dated 8 October; re-measured today (551 passed) and dated so.
 
+
+## 2026-10-12 — the exposure table answers questions in plain words, and the model computes nothing
+
+`src/nlquery.py` (new), `api/main.py` (`POST /api/ask`), `app/streamlit_app.py`
+(tab "Ask the table"), `tests/test_nlquery.py` (new), `tests/test_streamlit_app.py`
+
+**What.** The item `limitations.md` §2 listed as designed and not built, from
+`roles.md` hat 3: someone who does not write pandas can ask the table a
+question. One model call turns the question into a JSON query spec — columns,
+filters, one sort key, a row limit, one return period — through
+`rag.complete_with_provider`, the same provider path as the draft tab. The spec
+is validated and pandas runs it with boolean masks. No SQL, no generated code,
+no `DataFrame.query` string: nothing the model writes is evaluated.
+
+**What a reader must know to interpret an answer.**
+
+- **One return period per answer.** The period is its own field and a filter on
+  `return_period` is refused, because the extents are nested. Naming none means
+  the rarest period in the API (as `/api/exposure`) and the period selected above
+  the tabs in Streamlit, and `defaulted_return_period` says so.
+- **Rows, never aggregates.** No sum, mean or group-by, so the layer cannot
+  produce a figure the frozen table does not hold. `exposed_share` is the one
+  derived column, computed as `/api/exposure` computes it.
+- **Strict whitelist.** A column is queryable only when its definition is
+  written in `nlquery.COLUMNS`; an unknown column, operator or spec key is
+  refused (422 from the API) with the rule it broke, never dropped silently.
+  The region identifier is always shown, and `hazard_coverage` is added beside
+  `exposed_pop`.
+- **Nulls are counted.** A region not measured fails every comparison; the
+  answer reports how many rows were excluded for a null on a filtered column, so
+  "not measured" does not travel as "does not match".
+- **Every column touched carries its unit, definition and source** in
+  `definitions`.
+- **No key, no model:** the route answers 502 naming the `spec` form, which runs
+  with no model at all. A refused spec is never retried.
+
+**NOT a measurement change.** No existing figure moved. Proof: 39 fixed
+requests to the existing routes (`/api/meta`, `/api/exposure` at no period and at
+each of the nine periods plus an absent one, `/api/context`, `/api/languages`,
+24 `/api/vulnerability` calls over six indicator sets and four periods) were
+answered on a frozen copy of the real tables before and after, and the two dumps
+are byte-identical. On the same tables, a spec for the five Belgian regions with
+the largest exposed share at RP100 returns the same `exposed_pop` and
+`exposed_share` as `/api/exposure` for each row, and reports 7 regions with no
+measured `exposed_pop` at RP500, the period chosen when none is named.
+
+**Revisit if** a team needs the context table (climate, basins, APSFR) in plain
+words: it would need its own whitelist, and its columns must never be joined
+onto the exposure frame, for the reason `api/main.py` gives above `_context`.
+
+Tests: 569 before, 623 after (51 new in `tests/test_nlquery.py`, 3 new in
+`tests/test_streamlit_app.py`), all passing in WSL with no `data/`.
