@@ -87,7 +87,7 @@ from urllib.parse import urlparse
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.data_io import DATA, sources  # noqa: E402
-from src.fetch import _target_path, expand, why_not_a_document_on_disk  # noqa: E402
+from src.fetch import expand, target_of, why_not_a_document_on_disk  # noqa: E402
 from src.rdh import CACHE_DIR as RDH_CACHE_DIR  # noqa: E402
 from src.rdh import COLLECTIONS as RDH_COLLECTIONS  # noqa: E402
 
@@ -167,7 +167,7 @@ def declared_targets(data_dir: Path = DATA) -> list[tuple[str, str, Path]]:
             if access == "api":
                 continue
             for job in expand(entry):
-                path = _target_path(job["id"], job["url"], access)
+                path = target_of(job, access)
                 targets.append((job["id"], access, data_dir / path.relative_to(DATA)))
     return targets
 

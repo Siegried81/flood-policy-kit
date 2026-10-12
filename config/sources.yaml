@@ -905,6 +905,9 @@ policy_corpus:  # the "cite or refuse" RAG corpus
   - id: nist_robust_ai_alignment_limits
     url: https://arxiv.org/pdf/2512.10100
     landing: https://www.nist.gov/publications/robust-ai-security-and-alignment-sisyphean-endeavor
+    # The arXiv id ends the path, so without this the PDF was stored as
+    # `.10100`, a suffix `rag._read` does not parse: on disk, never indexed.
+    suffix: .pdf
     access: scrape
     doi: 10.1109/MSEC.2026.3678214
     purpose: >
@@ -960,6 +963,178 @@ policy_corpus:  # the "cite or refuse" RAG corpus
       the fetch stores the page and not the paper.
     verified: 2026-10-06 (landing page only)
 
+  # The documents docs/policy_context.md cites for its figures and that the
+  # retrieval layer could not cite back, because nothing here declared them.
+  #
+  # The six EU acts are fetched from the Publications Office's CELLAR
+  # (`publications.europa.eu/resource/celex/<CELEX>`), not from eur-lex. Measured
+  # 2026-10-12 with this repo's own headers: every eur-lex URL for these six
+  # answers HTTP 202 with the 2,035-byte AWS WAF challenge `_REJECTION_MARKERS`
+  # refuses, while CELLAR answers 303 to the English manifestation of the same
+  # CELEX and then 200 with its XHTML. publications.europa.eu/robots.txt
+  # redirects to op.europa.eu/robots.txt, a readable file whose rules allow
+  # /resource/, so no derogation is needed. The
+  # redirect lands on plain http://publications.europa.eu/resource/cellar/...,
+  # which is the Office's own address for the stored file. The CELEX numbers are
+  # the ones config/legislation.yaml verified; a parenthesis in a CELEX is
+  # percent-encoded, because CELLAR answers 404 to the raw form.
+  - id: union_disaster_resilience_goals
+    url: https://publications.europa.eu/resource/celex/32023H0215%2801%29
+    landing: https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32023H0215(01)
+    access: scrape
+    licence: Commission Decision 2011/833/EU (reuse authorised, source acknowledged)
+    purpose: >
+      Commission Recommendation of 8 February 2023 on Union disaster resilience
+      goals (2023/C 56/01). Goal 3 (early warning by 2030) and the Goal 4 flood
+      benchmark - respond to a flood affecting three Member States at once - are
+      the EU's own yardsticks for preparedness.
+    caveat: >
+      XHTML in English, HTTP 200 via CELLAR, verified 2026-10-12; no
+      Content-Length is sent, so the size is not recorded. Non-binding.
+    verified: 2026-10-12
+
+  - id: ucpm_decision
+    url: https://publications.europa.eu/resource/celex/32013D1313
+    landing: https://eur-lex.europa.eu/eli/dec/2013/1313/oj
+    access: scrape
+    licence: Commission Decision 2011/833/EU (reuse authorised, source acknowledged)
+    purpose: >
+      Decision No 1313/2013/EU on a Union Civil Protection Mechanism. Article 6
+      makes national risk assessment and risk-management planning a standing
+      legal duty of every Member State.
+    caveat: >
+      XHTML in English, HTTP 200 via CELLAR, verified 2026-10-12. This is the
+      text as ADOPTED in 2013, not the consolidated version: Regulation (EU)
+      2021/836 amended it, so check any article against the consolidated text
+      before quoting it as in force.
+    verified: 2026-10-12
+
+  - id: eu_adaptation_strategy_2021
+    url: https://publications.europa.eu/resource/celex/52021DC0082
+    landing: https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:52021DC0082
+    access: scrape
+    licence: Commission Decision 2011/833/EU (reuse authorised, source acknowledged)
+    purpose: >
+      COM(2021) 82, the EU Strategy on Adaptation to Climate Change, 24 February
+      2021: the "only 35% of climate-related losses are insured" figure.
+    caveat: >
+      XHTML in English, HTTP 200 via CELLAR, verified 2026-10-12. Its loss
+      figures are a 2021 baseline superseded by eea_economic_losses_indicator.
+    verified: 2026-10-12
+
+  - id: water_resilience_strategy_2025
+    url: https://publications.europa.eu/resource/celex/52025DC0280
+    landing: https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:52025DC0280
+    access: scrape
+    licence: Commission Decision 2011/833/EU (reuse authorised, source acknowledged)
+    purpose: >
+      COM(2025) 280, the European Water Resilience Strategy, 4 June 2025: the
+      Commission's commitment to better early warning and real-time monitoring
+      for floods and droughts.
+    caveat: HTML in English, HTTP 200 via CELLAR, verified 2026-10-12.
+    verified: 2026-10-12
+
+  - id: floods_directive_assessment_swd_2025_24
+    url: https://publications.europa.eu/resource/celex/52025SC0024
+    landing: https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:52025SC0024
+    access: scrape
+    licence: Commission Decision 2011/833/EU (reuse authorised, source acknowledged)
+    purpose: >
+      SWD(2025) 24, the Commission's assessment of the second-cycle flood risk
+      management plans for Spain, 4 February 2025 - the one member of the
+      SWD(2025) series docs/policy_context.md cites by number.
+    caveat: >
+      XHTML in English, HTTP 200 via CELLAR, verified 2026-10-12. ONE document
+      of a series published one per Member State on the same day; the others,
+      Belgium's included, are not declared because their CELEX numbers were
+      never recorded. Do not quote this one as the Commission's view of Europe.
+    verified: 2026-10-12
+
+  - id: ai_act_digital_omnibus_2026
+    url: https://publications.europa.eu/resource/celex/32026R1744
+    landing: https://eur-lex.europa.eu/eli/reg/2026/1744/oj
+    access: scrape
+    licence: Commission Decision 2011/833/EU (reuse authorised, source acknowledged)
+    purpose: >
+      Regulation (EU) 2026/1744 ("Digital Omnibus on AI"), the amendment to the
+      AI Act in force since 27 July 2026. The `ai_act` entry is the 2024 text;
+      without this one the corpus answers AI Act questions from a superseded
+      version.
+    caveat: XHTML in English, HTTP 200 via CELLAR, verified 2026-10-12.
+    verified: 2026-10-12
+
+  - id: eea_eucra_2024
+    url: https://www.eea.europa.eu/en/analysis/publications/european-climate-risk-assessment
+    access: scrape
+    purpose: >
+      EEA Report 01/2024, the European Climate Risk Assessment (EUCRA): 36
+      climate risks, river and pluvial flooding among the eight most urgent.
+    caveat: >
+      HTML LANDING PAGE, HTTP 200, verified 2026-10-12; the report PDF's address
+      was not resolved, so the fetch stores the page and not the report. Its
+      "EUR 170 bn since 1980" for floods is a different vintage and price basis
+      from the EEA 2025 indicator - quote the indicator, never both as one figure.
+    verified: 2026-10-12 (landing page only)
+
+  - id: eea_economic_losses_indicator
+    url: https://www.eea.europa.eu/en/analysis/indicators/economic-losses-from-climate-related
+    access: scrape
+    purpose: >
+      EEA indicator "Economic losses from weather- and climate-related extremes
+      in Europe", 14 October 2025: EUR 822 bn of losses in the EU 1980-2024, 47%
+      of them floods, hydrological losses about 15% insured. The loss figure the
+      brief should use.
+    caveat: >
+      187,742 B HTML, HTTP 200, verified 2026-10-12. An indicator page is
+      updated in place: record the publication date beside any figure taken
+      from it.
+    verified: 2026-10-12
+
+  - id: eiopa_protection_gap_nutshell_2025
+    url: https://www.eiopa.europa.eu/document/download/bbdc653b-e335-41f0-8293-0d8280a09855_en
+    landing: https://www.eiopa.europa.eu/tools-and-data/dashboard-insurance-protection-gap-natural-catastrophes_en
+    # The path names no file type; the host serves application/pdf.
+    suffix: .pdf
+    access: scrape
+    purpose: >
+      EIOPA-BoS-25/564, the protection-gap dashboard "in a nutshell", 10 November
+      2025: Belgium's current flood score (1.5) and total score (6), and the
+      country comments the brief quotes on the insurance paradox.
+    caveat: >
+      PDF (application/pdf), HTTP 200, verified 2026-10-12; no Content-Length is
+      sent. EIOPA's own text says "seven countries" and then lists eight for
+      flood - quote the list, not the count.
+    verified: 2026-10-12
+
+  - id: wallonia_floods_review_2022
+    url: https://www.wallonie.be/sites/default/files/2022-07/%5BCP%5D%20-%20Inondations%20de%20juillet%202021%20-%20Bilan%20et%20perspectives.pdf
+    landing: https://www.wallonie.be/fr/inondations-de-juillet-2021-rapports-etudes-projets-subventions
+    access: scrape
+    purpose: >
+      Walloon Government press release "Inondations de juillet 2021 : Bilan et
+      perspectives", 4 July 2022: 39 deaths, 209 of 262 communes, EUR 2.8 bn
+      cost to the Region, and the 20% insurance cap the Region stepped in to
+      lift.
+    caveat: >
+      205,412 B PDF in FRENCH, HTTP 200, verified 2026-10-12. A press release
+      of the government that paid: it is the official count, and it is also an
+      interested party's account of its own response.
+    verified: 2026-10-12
+
+  - id: assuralia_floods_update_2023
+    url: https://press.assuralia.be/actualisation-relative-aux-inondations-de-juillet-2021
+    access: scrape
+    purpose: >
+      Assuralia (Belgian insurers' association) press release, 30 January 2023:
+      EUR 2 bn paid by insurers on EUR 2.4 bn of estimated damage, EUR 1.05 bn
+      to be reimbursed by the Walloon Region.
+    caveat: >
+      HTML in FRENCH, HTTP 200, verified 2026-10-12. The industry's own figures.
+      Its four-year update page answered 404 when the research was done; the
+      later figures (about 74,000 claims) remain press-sourced and are not
+      declared.
+    verified: 2026-10-12
+
 context:  # know your jury
   - id: fari_manifesto
     url: https://www.fari.brussels/manifesto
@@ -973,3 +1148,20 @@ context:  # know your jury
     url: https://joint-research-centre.ec.europa.eu/events/european-ai-challenge-2026-data-policy-2026-10-29_en
     access: scrape
     purpose: programme, eligibility, registration
+
+  # Data behind the insurance figures, not a document: `rag._read` skips .xlsx,
+  # so it is declared here rather than in the retrieval corpus.
+  - id: eiopa_protection_gap_dashboard_data
+    url: https://www.eiopa.europa.eu/document/download/d507df26-1ee3-43f8-858e-ad1882bc89de_en
+    landing: https://www.eiopa.europa.eu/tools-and-data/dashboard-insurance-protection-gap-natural-catastrophes_en
+    # The path names no file type; the host serves the xlsx content type.
+    suffix: .xlsx
+    access: scrape
+    purpose: >
+      EIOPA-BoS-24/474, the dashboard's input data per country and peril,
+      2022-2025: the table the windstorm and flood insured shares in
+      docs/policy_context.md were re-derived from.
+    caveat: >
+      XLSX (spreadsheetml), HTTP 200, verified 2026-10-12; no Content-Length is
+      sent. Read it with pandas; it never enters the retrieval index.
+    verified: 2026-10-12

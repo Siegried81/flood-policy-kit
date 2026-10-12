@@ -97,7 +97,8 @@ flood-policy-kit/
 │   ├── toon_io.py              # compact table encoding for LLM prompts
 │   ├── fetch.py                # parallel, polite, idempotent collection
 │   ├── workflow.py             # LangGraph brief pipeline with an approval gate
-│   └── rag.py                  # grounded "cite or refuse" over the policy corpus
+│   ├── rag.py                  # grounded "cite or refuse" over the policy corpus
+│   └── nlquery.py              # plain-words questions -> a whitelisted query spec, run by pandas
 ├── scripts/
 │   ├── build_exposure.py            # freezes data/processed/exposure.parquet, one row per NUTS3 x RP
 │   ├── build_context.py             # freezes data/processed/context.parquet, what qualifies an exposure figure
@@ -107,7 +108,7 @@ flood-policy-kit/
 ├── api/main.py                 # JSON API over src/, for the React UI
 ├── api/mcp_server.py           # 3 intent-based MCP tools for agents, answered in flat TOON
 ├── web/                        # React + Vite UI: choropleth, sensitivity, approval gate
-├── app/streamlit_app.py        # six tabs, no build step: the React five plus the AI log
+├── app/streamlit_app.py        # seven tabs, no build step: the React five, ask-the-table, the AI log
 ├── templates/policy_brief.md   # the 2-page deliverable
 ├── Dockerfile                  # Linux image: the portability answer, not a requirement here
 ├── docker-compose.yml          # Streamlit / API / tests / offline check / portable demo
@@ -132,12 +133,25 @@ refused `rasterio`'s own GDAL build, which no pin fixed; by 2026-10-08 it allowe
 the same wheel again with nothing reinstalled. **The policy moves both ways, so
 measure rather than believe either state** — measured 2026-10-12, it blocks
 `import rasterio` again, so the three raster test modules do not collect on
-Windows, while the WSL2 venv runs the whole suite: **<!-- numbers:tests_collected -->579<!-- /numbers --> passed, nothing
+Windows, while the WSL2 venv runs the whole suite: **<!-- numbers:tests_collected -->650<!-- /numbers --> passed, nothing
 deselected**. The WSL2 venv stays, because it is the only route that does
 not depend on the policy's mood and it is where a continental raster build
-belongs. **Neither container has ever been built:** the Docker daemon is not running on this machine, so both are
-reviewed but untested, and the first build belongs in the dress-rehearsal week
-rather than on the morning of the event.
+belongs. **The `app` image was built and run on 2026-10-12:** `rasterio`,
+`pyogrio`, `rasterstats` and `tiktoken` all import inside it. Run there without
+`data/` or `.env`, the suite gave 562 passed and 7 failed, every failure a
+provider test reading the `OLLAMA_URL` that Compose sets (fixed on
+`fix/hermetic-llm-tests-12-10`). Through `docker compose run test` it gave 558
+passed and 11 failed: the same 7, and 4 not yet diagnosed. An image built on
+2026-10-09 could not import `rasterio` (`libexpat.so.1` missing) while a fresh
+build of the same Dockerfile can, so rebuild rather than trust an old local
+image: `docker compose build`. The `portable` image has not been built yet.
+
+**VS Code dev container.** `.devcontainer/` opens the editor inside that image
+(`Ctrl+Shift+P` → *Dev Containers: Reopen in Container*): a `dev` service with
+the checkout mounted at `/workspaces/flood-policy-kit`, `data/` included, so
+tests and raster work run on Linux without the WSL venv. It leaves `app` and
+`api` untouched and runs nothing until you do; Streamlit and the API started
+from its terminal are forwarded on 8501 and 8010.
 
 ## Docs, in reading order
 
@@ -165,7 +179,7 @@ rather than on the morning of the event.
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m pytest -q           # <!-- numbers:tests_collected -->579<!-- /numbers --> tests, offline: no network, no model
+.venv/bin/python -m pytest -q           # <!-- numbers:tests_collected -->650<!-- /numbers --> tests, offline: no network, no model
                                         # Measured 2026-10-12 in WSL2, nothing
                                         # deselected. Smart App Control blocks
                                         # rasterio on Windows some days and not
@@ -174,8 +188,8 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
                                         # requirements.txt for the whole story.
                                         #   wsl -d Ubuntu
                                         #   ~/.venvs/flood/bin/python -m pytest -q
-.venv/bin/python -m src.fetch           # 37 geodata downloads + 13 policy_corpus
-                                        # + 2 context = 52 files, ≈3.82 GiB
+.venv/bin/python -m src.fetch           # 37 geodata downloads + 24 policy_corpus
+                                        # + 3 context = 64 files, ≈3.82 GiB
                                         # (before 25 Oct, once)
 .venv/bin/python scripts/build_exposure.py --stripes 72 # -> data/processed/exposure.parquet
 .venv/bin/python scripts/build_context.py  --stripes 72 # -> data/processed/context.parquet
@@ -213,6 +227,25 @@ claude mcp add flood-kit -- .venv/bin/python -m api.mcp_server   # register in C
 docker compose --profile agent run --rm -T mcp          # same, inside the container
 ```
 
+### Asking the table in plain words
+
+The Streamlit tab **Ask the table** and `POST /api/ask` let someone who does not
+write pandas interrogate `exposure.parquet`. The model writes a small JSON query
+spec and nothing else; `src/nlquery.py` refuses any column or operator outside
+its whitelist and pandas runs the rest, so every figure in an answer is a value
+of the frozen table. Each answer names its return period and carries the
+definition and unit of every column it used.
+
+```bash
+curl -s localhost:8010/api/ask -H 'Content-Type: application/json' \
+  -d '{"question": "Which five Belgian regions have the largest share exposed at RP100?"}'
+# No key and no local model? Send the spec itself; no model is called.
+curl -s localhost:8010/api/ask -H 'Content-Type: application/json' -d '{"spec": {
+  "columns": ["region", "exposed_share"], "return_period": 100, "limit": 5,
+  "filters": [{"column": "country", "op": "==", "value": "BE"}],
+  "sort": {"column": "exposed_share", "descending": true}}}'
+```
+
 `--stripes` is memory, not meaning: the windows are disjoint, so the figures do
 not depend on it, and `tests/test_stripes.py` holds that. The default of 10 was
 enough on a workstation and is not enough inside a 16 GB WSL VM — a nine-period
@@ -234,18 +267,21 @@ with no tile provider and no API key, so the map still works with the network
 unplugged. Streamlit is the fallback that needs no `npm`.
 
 Data is **not** committed (`data/` is ignored): run `.venv/bin/python -m src.fetch` to
-download what `config/sources.yaml` declares — **24 `geodata` entries that expand
+download what `config/sources.yaml` declares — **27 `geodata` entries that expand
 to 49 jobs, of which 37 are downloadable files at ≈3.78 GiB** (the other twelve are
-`access: api`, queried at runtime and never stored), or **52 files and ≈3.82 GiB**
-once the `policy_corpus` (13 entries) and `context` (2) sections are included —
-every one of those fifteen a `scrape`. Of the geodata, the nine return periods are
+`access: api`, queried at runtime and never stored), or **64 files and ≈3.82 GiB**
+once the `policy_corpus` (24 entries) and `context` (3) sections are included —
+every one of those twenty-seven a `scrape`. Of the geodata, the nine return periods are
 2.61 GiB. Do this **before 25 October** — the Wi-Fi of a 60-person hackathon will
 not move gigabytes of raster. The run is idempotent, so an interrupted download
 costs only the files that are still missing.
 
 Those counts are `src.fetch.expand()` applied to `sources.yaml` as it stood on
-6 October 2026, and the byte totals are the `Content-Length` the hosts returned
-the same day — a reading of the config, not a property of the repo. Every entry
+12 October 2026, and the byte totals are the `Content-Length` the hosts returned
+on 6 October — a reading of the config, not a property of the repo. The twelve
+policy documents declared on 12 October are not in the byte total: two of them
+measure 0.37 MiB together and the other hosts send no `Content-Length`, so the
+total is a floor until a fetch measures them. Every entry
 added later moves them, so re-derive rather than quoting this paragraph.
 
 Three sources sit outside `python -m src.fetch`, and each for its own reason:

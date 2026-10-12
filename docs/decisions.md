@@ -1480,6 +1480,118 @@ Also: the test counts rewritten to 551 on 10 October sat under two sentences
 still dated 8 October; re-measured today (551 passed) and dated so.
 
 
+## 2026-10-12 — the exposure table answers questions in plain words, and the model computes nothing
+
+`src/nlquery.py` (new), `api/main.py` (`POST /api/ask`), `app/streamlit_app.py`
+(tab "Ask the table"), `tests/test_nlquery.py` (new), `tests/test_streamlit_app.py`
+
+**What.** The item `limitations.md` §2 listed as designed and not built, from
+`roles.md` hat 3: someone who does not write pandas can ask the table a
+question. One model call turns the question into a JSON query spec — columns,
+filters, one sort key, a row limit, one return period — through
+`rag.complete_with_provider`, the same provider path as the draft tab. The spec
+is validated and pandas runs it with boolean masks. No SQL, no generated code,
+no `DataFrame.query` string: nothing the model writes is evaluated.
+
+**What a reader must know to interpret an answer.**
+
+- **One return period per answer.** The period is its own field and a filter on
+  `return_period` is refused, because the extents are nested. Naming none means
+  the rarest period in the API (as `/api/exposure`) and the period selected above
+  the tabs in Streamlit, and `defaulted_return_period` says so.
+- **Rows, never aggregates.** No sum, mean or group-by, so the layer cannot
+  produce a figure the frozen table does not hold. `exposed_share` is the one
+  derived column, computed as `/api/exposure` computes it.
+- **Strict whitelist.** A column is queryable only when its definition is
+  written in `nlquery.COLUMNS`; an unknown column, operator or spec key is
+  refused (422 from the API) with the rule it broke, never dropped silently.
+  The region identifier is always shown, and `hazard_coverage` is added beside
+  `exposed_pop`.
+- **Nulls are counted.** A region not measured fails every comparison; the
+  answer reports how many rows were excluded for a null on a filtered column, so
+  "not measured" does not travel as "does not match".
+- **Every column touched carries its unit, definition and source** in
+  `definitions`.
+- **No key, no model:** the route answers 502 naming the `spec` form, which runs
+  with no model at all. A refused spec is never retried.
+
+**NOT a measurement change.** No existing figure moved. Proof: 39 fixed
+requests to the existing routes (`/api/meta`, `/api/exposure` at no period and at
+each of the nine periods plus an absent one, `/api/context`, `/api/languages`,
+24 `/api/vulnerability` calls over six indicator sets and four periods) were
+answered on a frozen copy of the real tables before and after, and the two dumps
+are byte-identical. On the same tables, a spec for the five Belgian regions with
+the largest exposed share at RP100 returns the same `exposed_pop` and
+`exposed_share` as `/api/exposure` for each row, and reports 7 regions with no
+measured `exposed_pop` at RP500, the period chosen when none is named.
+
+**Revisit if** a team needs the context table (climate, basins, APSFR) in plain
+words: it would need its own whitelist, and its columns must never be joined
+onto the exposure frame, for the reason `api/main.py` gives above `_context`.
+
+Tests: 569 before, 623 after (51 new in `tests/test_nlquery.py`, 3 new in
+`tests/test_streamlit_app.py`), all passing in WSL with no `data/`.
+
+## 2026-10-12 — twelve of the thirteen cited policy sources are declared, and one declared PDF was never indexed
+
+`config/sources.yaml`, `src/fetch.py` (`target_of`, `suffix:`),
+`scripts/check_offline_readiness.py`, `tests/test_fetch.py`, `docs/policy_context.md`
+
+**What.** `policy_context.md` cited thirteen documents that `sources.yaml` never
+declared, so the retrieval layer could not cite them back. Twelve are now
+declared: eleven in `policy_corpus`, and the EIOPA input spreadsheet in `context`
+because `rag._read` does not read `.xlsx`. Each URL was checked once on
+2026-10-12 through `src.fetch`'s own robots gate and headers, reading only the
+first 4 KiB of the body.
+
+**Where the six EU acts come from, and why.** Every eur-lex URL for them answered
+**HTTP 202** with the 2,035-byte AWS WAF challenge, which the fetcher refuses -
+the same wall the existing `floods_directive` and `ai_act` entries sit behind.
+The Publications Office's CELLAR (`publications.europa.eu/resource/celex/<CELEX>`)
+answered **303 then 200** with the English XHTML of each act, under a readable
+robots.txt that allows the path, so no derogation was needed. A CELEX with a
+parenthesis has to be percent-encoded there (`32023H0215%2801%29`; the raw form
+is 404). eur-lex stays on each entry as the human-readable `landing`.
+
+**Not declared, and why.** The Belgian Insurance Act of 4 April 2014: its ELI on
+www.ejustice.just.fgov.be is **disallowed by that host's robots.txt**, and a
+declared file the fetcher must refuse would hold the offline check at BLOCKED
+for good. (The verification script requested that page once after the robots
+gate had said "disallowed"; nothing was stored, and the fetcher itself never
+reaches it.) The SWD(2025) series beyond Spain's SWD(2025) 24, whose CELEX
+numbers were never recorded. EUCRA is declared as its landing page; the report
+PDF was not resolved.
+
+**A defect found by the new guard, and fixed.** `_target_path` names a file from
+the URL's suffix, and `nist_robust_ai_alignment_limits` is
+`https://arxiv.org/pdf/2512.10100` - stored as
+`nist_robust_ai_alignment_limits.10100`. `rag._read` picks its parser by suffix
+and returns "" for that one. Measured on the copy on disk (447,655 B, a valid
+`%PDF-1.7`): **0 characters and 0 passages** under its stored name, **25,592
+characters and 32 passages** read as `.pdf`. The paper the responsible-AI
+section quotes for "no finite set of guardrails is robust" was declared,
+fetched, fingerprinted in the manifest and never in the index. An entry may now
+declare `suffix:`; that one says `.pdf`, as do the two EIOPA endpoints whose
+paths name no type (`/document/download/<uuid>_en`). A test now requires every
+`policy_corpus` file to land in a format `rag._read` parses.
+
+**What a reader must know.** The retrieval corpus grows from 13 to 24 entries
+once `python -m src.fetch` runs; until then the twelve new files are missing and
+the offline check says so. The arXiv paper is now expected under `.pdf`, so the
+next fetch downloads it again (447,655 B) - or rename the existing file to skip
+that. Declared inputs move 42 -> 54, with a verification date 34 -> 46 and a
+`licence:` 11 -> 17 (the six EU acts carry Commission Decision 2011/833/EU);
+files 52 -> 64. The byte totals quoted in the docs are the 6 October
+`Content-Length`; most of the new hosts send none, so those totals are a floor.
+
+**NOT a measurement change for any exposure figure.** Nothing under `src/`
+that computes a figure was touched; 39 fixed API requests (meta, exposure at every
+period, context, 24 vulnerability rankings) are byte-identical before and after
+on a frozen copy of the real tables.
+
+Tests: 569 before, 586 after (17 new in `tests/test_fetch.py`), all passing in
+WSL2 with no `data/`.
+
 ## 2026-10-12 — the poverty rate says it is a percentage, in its name
 
 `src/demographics.py` (`LEGACY_COLUMNS`, `with_current_names`),

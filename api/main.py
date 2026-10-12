@@ -39,7 +39,7 @@ from pydantic import BaseModel, Field
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src import rag, translate  # noqa: E402
+from src import nlquery, rag, translate  # noqa: E402
 from src.toon_io import flatten, to_toon, token_report  # noqa: E402
 from src.demographics import LEGACY_COLUMNS, with_current_names  # noqa: E402
 from src.vulnerability import sensitivity  # noqa: E402
@@ -514,6 +514,45 @@ def draft(req: DraftRequest) -> dict:
         "invalid_citations": rag.invalid_citations(text, len(passages)),
         "tokens": _public_token_report(df),
     }
+
+
+class AskRequest(BaseModel):
+    #: Exactly one of the two. `spec` is the route with no model behind it, so the
+    #: table stays queryable with no key and no local model running.
+    question: str | None = Field(default=None, min_length=1, max_length=nlquery.MAX_QUESTION_CHARS)
+    spec: dict | None = None
+
+
+@app.post("/api/ask")
+def ask(req: AskRequest) -> dict:
+    """A question about the exposure table, answered by pandas from a validated spec.
+
+    The model only translates the question into a query spec - columns, filters,
+    one sort key, a limit, one return period - and `src.nlquery` refuses any
+    column or operator outside its whitelist before pandas runs it. So every
+    figure in the answer is a value of the frozen table, and the definitions of
+    the columns used travel with the rows.
+
+    A spec that breaks a rule comes back as **422** with the rule and the spec,
+    not as an empty 200: "no region matches" and "the question was not
+    understood" must not look alike.
+    """
+    if (req.question is None) == (req.spec is None):
+        raise HTTPException(status_code=400, detail="Send exactly one of `question` or `spec`.")
+    df = _table()
+    try:
+        if req.spec is not None:
+            answer = nlquery.execute(df, req.spec)
+        else:
+            answer = nlquery.ask(req.question, df)
+    except nlquery.SpecError as exc:
+        raise HTTPException(status_code=422, detail=f"Query refused: {exc}") from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=_upstream_failure(exc) + " A query `spec` can still be sent without a model.",
+        ) from exc
+    return {"question": req.question, **answer.as_dict()}
 
 
 class TranslateRequest(BaseModel):

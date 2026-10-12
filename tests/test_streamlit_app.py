@@ -1014,3 +1014,67 @@ def test_a_table_frozen_before_the_units_rename_offers_the_current_name():
 
     assert app_test.exception == [], app_test.exception
     assert offered == ["exposed_pop", "share_over_65", "poverty_rate_pct"]
+
+
+# --- the ask-the-table tab -------------------------------------------------------
+#
+# Every interaction stays inside `_frozen`: a `.run()` outside it unpatches
+# `Path.stat`, reads the real data/ on a dev machine and nothing at all on the
+# runner, so the test would pass locally and fail in CI.
+
+def test_a_typed_spec_is_answered_with_no_model(monkeypatch):
+    def unreachable(*args, **kwargs):
+        raise AssertionError("the spec route must not call a model")
+    monkeypatch.setattr(rag, "complete_with_provider", unreachable)
+    with _frozen(_nested_table()):
+        app_test = AppTest.from_file(str(APP), default_timeout=60).run()
+        box = next(t for t in app_test.text_area if t.label == "Query spec (JSON)")
+        box.set_value(
+            '{"columns": ["exposed_pop"], "sort": {"column": "exposed_pop", '
+            '"descending": true}, "limit": 1}'
+        ).run()
+        next(b for b in app_test.button if b.label == "Run this spec").click().run()
+
+    assert app_test.exception == [], app_test.exception
+    answer = app_test.dataframe[-2].value
+    # Answered for the period selected on the page (the rarest, RP500), with
+    # the identifier added although the spec did not ask for it.
+    assert list(answer["nuts_id"]) == ["BE31"]
+    assert list(answer["exposed_pop"]) == [7000.0]
+    assert "1-in-500 year" in _texts(app_test)
+    definitions = app_test.dataframe[-1].value
+    assert "exposed_pop" in list(definitions["column"])
+
+
+def test_a_question_goes_through_one_model_call(monkeypatch):
+    calls = []
+
+    def model(prompt, system):
+        calls.append(prompt)
+        return rag.Completion(
+            '{"columns": ["exposed_pop"], "sort": {"column": "exposed_pop", '
+            '"descending": false}, "limit": 1, "return_period": 10}', "groq")
+    monkeypatch.setattr(rag, "complete_with_provider", model)
+    with _frozen(_nested_table()):
+        app_test = AppTest.from_file(str(APP), default_timeout=60).run()
+        box = next(t for t in app_test.text_input if t.label == "Question about the table")
+        box.set_value("Least exposed region at the 10-year flood?").run()
+        next(b for b in app_test.button if b.label == "Ask").click().run()
+
+    assert app_test.exception == [], app_test.exception
+    assert len(calls) == 1
+    assert list(app_test.dataframe[-2].value["nuts_id"]) == ["BE33"]
+    assert "1-in-10 year" in _texts(app_test)
+    assert "Spec written by groq" in _texts(app_test)
+
+
+def test_a_spec_outside_the_whitelist_is_shown_as_a_refusal(monkeypatch):
+    with _frozen(_nested_table()):
+        app_test = AppTest.from_file(str(APP), default_timeout=60).run()
+        box = next(t for t in app_test.text_area if t.label == "Query spec (JSON)")
+        box.set_value('{"columns": ["__import__"]}').run()
+        next(b for b in app_test.button if b.label == "Run this spec").click().run()
+
+    assert app_test.exception == [], app_test.exception
+    assert "Query refused" in _texts(app_test)
+    assert "unknown column '__import__'" in _texts(app_test)
