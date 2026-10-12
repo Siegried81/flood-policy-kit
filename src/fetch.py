@@ -425,10 +425,22 @@ def _why_not_a_document(
     return None
 
 
-def _target_path(source_id: str, url: str, kind: str) -> Path:
-    """Where a source lands on disk. One rule, so nothing has to guess later."""
-    suffix = Path(urlparse(url).path).suffix or (".html" if kind == "scrape" else ".bin")
+def _target_path(source_id: str, url: str, kind: str, suffix: str | None = None) -> Path:
+    """Where a source lands on disk. One rule, so nothing has to guess later.
+
+    The suffix is read off the URL unless the entry declares `suffix:`. That key
+    exists for download endpoints whose path names no file type
+    (`/document/download/<uuid>_en` on eiopa.europa.eu serves a PDF): without it
+    the PDF was named `.html`, and `rag._read` picks its parser by suffix, so
+    the corpus would have indexed the PDF's bytes as markup.
+    """
+    suffix = suffix or Path(urlparse(url).path).suffix or (".html" if kind == "scrape" else ".bin")
     return DATA / "raw" / kind / f"{source_id}{suffix}"
+
+
+def target_of(entry: dict, kind: str) -> Path:
+    """`_target_path` for a declared entry or an `expand` job, honouring `suffix:`."""
+    return _target_path(entry["id"], entry["url"], kind, entry.get("suffix"))
 
 
 #: Bytes of a file's head that `_why_not_a_document` needs: the WAF and
@@ -483,7 +495,7 @@ def path_collisions(jobs: list[tuple[dict, str]]) -> dict[Path, list[str]]:
     """
     seen: dict[Path, list[str]] = {}
     for entry, kind in jobs:
-        seen.setdefault(_target_path(entry["id"], entry["url"], kind), []).append(entry["id"])
+        seen.setdefault(target_of(entry, kind), []).append(entry["id"])
     return {path: ids for path, ids in seen.items() if len(ids) > 1}
 
 
@@ -543,7 +555,7 @@ def _fetch_one(
     # a fresh download must pass is moved aside as `<name>.rejected` - kept, not
     # deleted, because it is evidence of what an earlier run accepted - and the
     # download below runs as if it had never existed.
-    existing = _target_path(source_id, url, kind)
+    existing = target_of(entry, kind)
     if existing.exists() and existing.stat().st_size > 0:
         rejection = why_not_a_document_on_disk(existing)
         if rejection is None:
@@ -589,7 +601,7 @@ def _fetch_one(
         # removed rather than left to rot into a licence to ignore robots.txt.
         derogation = None
 
-    path = _target_path(source_id, url, kind)
+    path = target_of(entry, kind)
     # Streamed to a sibling `.part` and renamed only once the body has been
     # accepted. Writing in place would leave a truncated file behind on a dropped
     # connection, and the idempotency check above - which only asks whether the

@@ -130,9 +130,10 @@ Windows host. The `pyogrio`/`pyproj` caps in `requirements.txt` bought back thre
 of them. Windows Smart App Control then moved to enforcement on 2026-10-07 and
 refused `rasterio`'s own GDAL build, which no pin fixed; by 2026-10-08 it allowed
 the same wheel again with nothing reinstalled. **The policy moves both ways, so
-measure rather than believe either state** — measured 2026-10-08, `import
-rasterio` works and the whole suite runs on Windows: **<!-- numbers:tests_collected -->569<!-- /numbers --> passed, nothing
-deselected**. The WSL2 venv stays anyway, because it is the only route that does
+measure rather than believe either state** — measured 2026-10-12, it blocks
+`import rasterio` again, so the three raster test modules do not collect on
+Windows, while the WSL2 venv runs the whole suite: **<!-- numbers:tests_collected -->586<!-- /numbers --> passed, nothing
+deselected**. The WSL2 venv stays, because it is the only route that does
 not depend on the policy's mood and it is where a continental raster build
 belongs. **Neither container has ever been built:** the Docker daemon is not running on this machine, so both are
 reviewed but untested, and the first build belongs in the dress-rehearsal week
@@ -164,17 +165,17 @@ rather than on the morning of the event.
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m pytest -q           # <!-- numbers:tests_collected -->569<!-- /numbers --> tests, offline: no network, no model
-                                        # Measured 2026-10-08 on Windows, nothing
-                                        # deselected. Smart App Control blocked
-                                        # rasterio on 2026-10-07 and allowed it
-                                        # again the next morning, so re-measure
+.venv/bin/python -m pytest -q           # <!-- numbers:tests_collected -->586<!-- /numbers --> tests, offline: no network, no model
+                                        # Measured 2026-10-12 in WSL2, nothing
+                                        # deselected. Smart App Control blocks
+                                        # rasterio on Windows some days and not
+                                        # others (blocked again 2026-10-12), so re-measure
                                         # rather than trust this number — see
                                         # requirements.txt for the whole story.
                                         #   wsl -d Ubuntu
                                         #   ~/.venvs/flood/bin/python -m pytest -q
-.venv/bin/python -m src.fetch           # 37 geodata downloads + 13 policy_corpus
-                                        # + 2 context = 52 files, ≈3.82 GiB
+.venv/bin/python -m src.fetch           # 37 geodata downloads + 24 policy_corpus
+                                        # + 3 context = 64 files, ≈3.82 GiB
                                         # (before 25 Oct, once)
 .venv/bin/python scripts/build_exposure.py --stripes 72 # -> data/processed/exposure.parquet
 .venv/bin/python scripts/build_context.py  --stripes 72 # -> data/processed/context.parquet
@@ -233,18 +234,21 @@ with no tile provider and no API key, so the map still works with the network
 unplugged. Streamlit is the fallback that needs no `npm`.
 
 Data is **not** committed (`data/` is ignored): run `.venv/bin/python -m src.fetch` to
-download what `config/sources.yaml` declares — **24 `geodata` entries that expand
+download what `config/sources.yaml` declares — **27 `geodata` entries that expand
 to 49 jobs, of which 37 are downloadable files at ≈3.78 GiB** (the other twelve are
-`access: api`, queried at runtime and never stored), or **52 files and ≈3.82 GiB**
-once the `policy_corpus` (13 entries) and `context` (2) sections are included —
-every one of those fifteen a `scrape`. Of the geodata, the nine return periods are
+`access: api`, queried at runtime and never stored), or **64 files and ≈3.82 GiB**
+once the `policy_corpus` (24 entries) and `context` (3) sections are included —
+every one of those twenty-seven a `scrape`. Of the geodata, the nine return periods are
 2.61 GiB. Do this **before 25 October** — the Wi-Fi of a 60-person hackathon will
 not move gigabytes of raster. The run is idempotent, so an interrupted download
 costs only the files that are still missing.
 
 Those counts are `src.fetch.expand()` applied to `sources.yaml` as it stood on
-6 October 2026, and the byte totals are the `Content-Length` the hosts returned
-the same day — a reading of the config, not a property of the repo. Every entry
+12 October 2026, and the byte totals are the `Content-Length` the hosts returned
+on 6 October — a reading of the config, not a property of the repo. The twelve
+policy documents declared on 12 October are not in the byte total: two of them
+measure 0.37 MiB together and the other hosts send no `Content-Length`, so the
+total is a floor until a fetch measures them. Every entry
 added later moves them, so re-derive rather than quoting this paragraph.
 
 Three sources sit outside `python -m src.fetch`, and each for its own reason:

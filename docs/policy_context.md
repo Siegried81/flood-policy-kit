@@ -41,6 +41,26 @@ from one of those thirteen is unciteable by the kit itself** and has to be eithe
 declared in `sources.yaml` and fetched, or carried into the brief as a manual
 citation with its URL. Do the first for anything the brief's argument rests on.
 
+**Declared on 12 October 2026: twelve of the thirteen.** In `policy_corpus`:
+`union_disaster_resilience_goals`, `ucpm_decision`, `eu_adaptation_strategy_2021`,
+`water_resilience_strategy_2025`, `floods_directive_assessment_swd_2025_24`,
+`ai_act_digital_omnibus_2026` (the six EU acts, fetched from the Publications
+Office's CELLAR because eur-lex answers every script with a WAF challenge),
+`eea_eucra_2024`, `eea_economic_losses_indicator`,
+`eiopa_protection_gap_nutshell_2025`, `wallonia_floods_review_2022`,
+`assuralia_floods_update_2023`; in `context`, `eiopa_protection_gap_dashboard_data`
+(a spreadsheet, which the retrieval layer does not read). They are citable once
+`python -m src.fetch` has run. Three gaps remain, each a manual citation:
+
+- **Belgian Insurance Act of 4 April 2014.** Its official text is
+  `https://www.ejustice.just.fgov.be/eli/loi/2014/04/04/2014011239/justel`, and
+  that host's robots.txt disallows the path (checked 2026-10-12), so the kit
+  does not fetch it.
+- **The SWD(2025) series** is one document per Member State; only Spain's,
+  SWD(2025) 24, has a recorded CELEX number and is declared.
+- **EEA Report 01/2024 (EUCRA)** is declared as its landing page; the report
+  PDF's address was not resolved.
+
 ---
 
 ## 1. Floods Directive 2007/60/EC
@@ -375,6 +395,6 @@ Annex III headings (verbatim) ✅: 1. **Biometrics** · 2. **Critical infrastruc
 ### Recommended RAG corpus (12 entries, 15 documents, all URL-verified above)
 Directive 2007/60/EC · Commission Recommendation 2023/C 56/01 (Union disaster resilience goals) · Decision 1313/2013/EU (UCPM) · COM(2021) 82 (Adaptation Strategy) · COM(2025) 280 (Water Resilience Strategy) · EEA Report 01/2024 (EUCRA) + EEA economic-losses indicator (14 Oct 2025) · EIOPA-BoS-25/564 + the dashboard `.xlsx` · Sendai Framework (official PDF) · Walloon Parliament Doc. 894 (2021-2022) N° 1 · JRC135679 (CEMS EFAS assessment of the July 2021 Rhine/Meuse floods) · Regulation (EU) 2024/1689 consolidated at 2026-07-27 + Regulation (EU) 2026/1744 · HLEG Ethics Guidelines for Trustworthy AI (2019).
 
-The list reads as 12 entries because three of them pair two documents (the two EEA items, the two EIOPA items, and the two AI-Act regulations) — count 15 if you are counting files to fetch. Only **six** of the twelve entries are declared in `sources.yaml` today — Directive 2007/60/EC, the Sendai Framework, Doc. 894, JRC135679, the HLEG guidelines, and the AI Act pair at half (Regulation (EU) 2024/1689 is declared, Regulation (EU) 2026/1744 is not). Building this corpus therefore means declaring and fetching nine more documents, not two; see the undeclared list at the top of this report.
+The list reads as 12 entries because three of them pair two documents (the two EEA items, the two EIOPA items, and the two AI-Act regulations) — count 15 if you are counting files to fetch. Only **six** of the twelve entries are declared in `sources.yaml` today — Directive 2007/60/EC, the Sendai Framework, Doc. 894, JRC135679, the HLEG guidelines, and the AI Act pair at half (Regulation (EU) 2024/1689 is declared, Regulation (EU) 2026/1744 is not). Building this corpus therefore means declaring and fetching nine more documents, not two; see the undeclared list at the top of this report. Since 12 October 2026 all nine are declared (the EIOPA spreadsheet as `context`, the EUCRA report as its landing page), and the corpus is complete once `python -m src.fetch` has run.
 
 Note for corpus construction: Doc. 894 and the Walloon Government press release are **French-language**; the Walloon inquiry report is the only source containing the EFAS-non-use finding, so the retrieval pipeline needs to handle FR/EN cross-language retrieval or a translated chunk layer. (This is also a `comparability: cross_language` concern if any of this feeds the Becode comparator repo's dictionary conventions.)

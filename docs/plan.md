@@ -28,7 +28,7 @@ time, so nothing to adjust.
 
 | Week | Goal | Done when |
 |---|---|---|
-| **Mon 5 → Sun 11** | Register. Learn the domain: Floods Directive, Sendai, Hazard×Exposure×Vulnerability. Download every dataset — **52 files, ≈3.82 GiB**. Get `geopandas`/`rasterio` under your fingers. | You can produce one map of exposed population on the Vesdre valley, 2021 |
+| **Mon 5 → Sun 11** | Register. Learn the domain: Floods Directive, Sendai, Hazard×Exposure×Vulnerability. Download every dataset — **64 files, ≈3.82 GiB**. Get `geopandas`/`rasterio` under your fingers. | You can produce one map of exposed population on the Vesdre valley, 2021 |
 | **Mon 12 → Sun 18** | The kit: exposure pipeline, vulnerability index, Streamlit map, tests, CI. | `pytest` green, `streamlit run` shows a real map |
 | **Mon 19 → Sun 25** | GenAI layer: grounded RAG over the policy corpus, brief template, responsible-AI checklist, deploy. **All downloads finished.** | App online, brief template filled with a dry-run result |
 | **Mon 26 → Wed 28** | **Full dress rehearsal**: an 8-hour solo hackathon on a *different* region (Valencia DANA 2024, or Emilia-Romagna 2023). Rehearse the pitch. Rest Wednesday evening. | A timed 3-minute pitch you can deliver without notes |
@@ -50,16 +50,18 @@ one PNG showing population exposed to a 100-year flood in the Vesdre valley,
 produced by `src/exposure.py`, with the number written on it. The valley is the
 rehearsal, not the answer — the deliverable is European, at NUTS3.
 
-**The download, measured.** `python -m src.fetch` is 52 files and ≈3.82 GiB — 37
-geodata downloads, 13 policy-corpus scrapes and 2 context scrapes, the `geodata`
+**The download, measured.** `python -m src.fetch` is 64 files and ≈3.82 GiB — 37
+geodata downloads, 24 policy-corpus scrapes and 3 context scrapes, the `geodata`
 section's other 12 jobs being runtime API calls that store nothing: the
 nine return periods alone are 2.61 GiB, and four entries expand to several files
 each, so the printed count is files rather than declared sources. Start it once
 and leave it; it is idempotent, so a dropped connection costs only the files that
 are actually missing. Do not expect `/vsicurl/` to save you the download — it
 pays off for a country window (2.4 MiB for Belgium on RP100) and collapses at EU
-scale (56% of the file in 35,525 requests). Both counts are `src.fetch.expand()`
-over `sources.yaml` as it stood on 6 October 2026 — every entry added later moves
+scale (56% of the file in 35,525 requests). The counts are `src.fetch.expand()`
+over `sources.yaml` as it stood on 12 October 2026 and the bytes the hosts'
+`Content-Length` on 6 October, which the twelve documents added on the 12th
+mostly do not send — every entry added later moves
 them, so re-derive rather than quoting this line.
 
 **One account to open this week.** The JRC Risk Data Hub needs an EU Login

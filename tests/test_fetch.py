@@ -534,7 +534,7 @@ def test_no_two_declared_files_land_on_the_same_path():
                 continue
             kind = entry.get("access", "download")
             for job in F.expand(entry):
-                paths.append(str(F._target_path(job["id"], job["url"], kind)))
+                paths.append(str(F.target_of(job, kind)))
 
     duplicates = {p for p in paths if paths.count(p) > 1}
     assert not duplicates, f"these declared files overwrite each other: {duplicates}"
@@ -641,3 +641,95 @@ def test_folder_entries_are_not_mirrored(workspace, monkeypatch):
         results = F.fetch_all(sections=("geodata",))
     get.assert_not_called()
     assert results == []
+
+
+# --- the policy sources docs/policy_context.md cited and nothing declared ----------
+
+#: The twelve entries added for the thirteen documents `policy_context.md` cited
+#: without a declaration. The thirteenth, the Belgian Insurance Act of 4 April
+#: 2014, is not declared: its ELI on www.ejustice.just.fgov.be is disallowed by
+#: that host's robots.txt (measured 2026-10-12), and a declared file the fetcher
+#: must refuse would hold the offline check at BLOCKED for good.
+UNDECLARED_UNTIL_2026_10_12 = {
+    "policy_corpus": [
+        "union_disaster_resilience_goals", "ucpm_decision",
+        "eu_adaptation_strategy_2021", "water_resilience_strategy_2025",
+        "floods_directive_assessment_swd_2025_24", "ai_act_digital_omnibus_2026",
+        "eea_eucra_2024", "eea_economic_losses_indicator",
+        "eiopa_protection_gap_nutshell_2025", "wallonia_floods_review_2022",
+        "assuralia_floods_update_2023",
+    ],
+    "context": ["eiopa_protection_gap_dashboard_data"],
+}
+
+
+def _declared(section):
+    from src.data_io import sources
+    return {e["id"]: e for e in sources(section) or []}
+
+
+@pytest.mark.parametrize("section, source_id", [
+    (section, source_id)
+    for section, ids in UNDECLARED_UNTIL_2026_10_12.items() for source_id in ids
+])
+def test_each_cited_policy_source_is_declared_with_its_provenance(section, source_id):
+    entry = _declared(section).get(source_id)
+    assert entry is not None, f"{source_id} is not declared in {section}"
+    assert entry["access"] == "scrape"
+    assert entry["url"].startswith("https://")
+    assert str(entry.get("purpose") or "").strip()
+    assert entry.get("verified"), "a declared URL carries the date it was checked"
+
+
+def test_no_new_eu_act_is_declared_on_the_waf_host():
+    """eur-lex answers every scripted GET with a 202 WAF challenge, so an act
+    declared there is an entry that can never be fetched. The six EU acts come
+    from CELLAR instead; eur-lex stays only as the human-readable `landing`."""
+    corpus = _declared("policy_corpus")
+    for source_id in UNDECLARED_UNTIL_2026_10_12["policy_corpus"][:6]:
+        assert corpus[source_id]["url"].startswith(
+            "https://publications.europa.eu/resource/celex/"), source_id
+        assert "eur-lex.europa.eu" in corpus[source_id]["landing"]
+        assert "robots_unreadable" not in corpus[source_id], (
+            "CELLAR's robots.txt is readable; a derogation here would be stale")
+
+
+def test_a_declared_suffix_names_the_file_when_the_url_does_not(workspace):
+    """eiopa.europa.eu serves a PDF at `/document/download/<uuid>_en`. Named from
+    the URL it became `.html`, and `rag._read` picks its parser by suffix."""
+    entry = {"id": "nutshell", "url": "https://example.org/document/download/ab-cd_en",
+             "suffix": ".pdf"}
+    assert F.target_of(entry, "scrape").name == "nutshell.pdf"
+    assert F.target_of({**entry, "suffix": None}, "scrape").name == "nutshell.html"
+    assert F.target_of(_entry(), "download") == F._target_path("src1", _entry()["url"], "download")
+
+
+def test_a_suffixed_entry_is_fetched_to_its_declared_name(workspace):
+    entry = {"id": "nutshell", "url": "https://example.org/document/download/ab-cd_en",
+             "suffix": ".pdf"}
+    body = b"%PDF-1.7\n" + b"x" * 3000
+    with patch.object(F.requests, "get", return_value=_Response(body)) as get:
+        result = F._fetch_one(entry, "scrape", F._HostThrottle(0), _AllowAllRobots())
+        again = F._fetch_one(entry, "scrape", F._HostThrottle(0), _AllowAllRobots())
+    assert result.ok and result.path.endswith("nutshell.pdf")
+    assert (workspace / "raw" / "scrape" / "nutshell.pdf").read_bytes() == body
+    assert get.call_count == 1, "the re-run must find the file under the same name"
+    assert again.ok
+
+
+def test_every_declared_suffix_is_a_plain_extension():
+    from src.data_io import sources
+    import re
+    for section in ("geodata", "policy_corpus", "context"):
+        for entry in sources(section) or []:
+            if "suffix" in entry:
+                assert re.fullmatch(r"\.[a-z0-9]{1,5}", str(entry["suffix"])), entry["id"]
+
+
+def test_every_corpus_document_lands_in_a_format_the_retrieval_layer_reads():
+    """A corpus file `rag._read` cannot parse is declared, fetched and then
+    silently absent from the index - unciteable while looking present."""
+    readable = {".pdf", ".txt", ".md", ".html", ".htm"}
+    for entry in _declared("policy_corpus").values():
+        for job in F.expand(entry):
+            assert F.target_of(job, "scrape").suffix in readable, job["id"]

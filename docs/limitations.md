@@ -163,9 +163,13 @@ rebuilt. The findings and recommendations themselves are in
   which would otherwise grow 6.5-fold in area; the caption names them.
   [`src/svgmap.py`](../src/svgmap.py) `OUTERMOST`,
   [`decisions.md`, 2026-10-08 "there was no map"](decisions.md#2026-10-08--the-first-scored-deliverable-was-missing-there-was-no-map).
-- **The retrieval layer cites only what it holds.** Diffed on 6 October 2026,
-  at least thirteen documents cited in `policy_context.md` are declared nowhere
-  in `config/sources.yaml` and are therefore unciteable by the kit itself. A draft is passed only above a 0.7 lexical grounding score and
+- **The retrieval layer cites only what it holds.** Of the thirteen documents
+  `policy_context.md` cited without a declaration on 6 October 2026, twelve are
+  declared since 12 October and enter the index only once `python -m src.fetch`
+  has run. Still unciteable by the kit: the Belgian Insurance Act of 4 April
+  2014 (its official ELI is disallowed by the host's robots.txt), the SWD(2025)
+  assessments other than Spain's, and the full EUCRA report (its landing page
+  only). A draft is passed only above a 0.7 lexical grounding score and
   then only to a human. [`policy_context.md`](policy_context.md),
   [`workflow.md`](workflow.md#the-four-guards-and-what-each-prevents).
 
@@ -205,15 +209,23 @@ written intent rather than from memory.
 - **Natural-language access to the exposure table.** Named as a role for the
   GenAI engineer; nothing in `src/`, `api/` or `app/` implements it. Design:
   [`roles.md`](roles.md#hat-3--genai-engineer-the-responsible-accelerator).
-- **The thirteen undeclared policy sources.** Listed by name so they can be
-  added to `config/sources.yaml` and fetched. Design:
-  [`policy_context.md`](policy_context.md).
 - **The Docker images.** `Dockerfile` and `docker-compose.yml` are written and
   have never been built; the daemon was not running on the development machine.
   Design: root [`README.md`](../README.md).
 - **The dress rehearsal on an unprepared region.** Scheduled for 26-28 October
   on Valencia 2024 or Emilia-Romagna 2023, precisely to find what is secretly
   hard-coded. Design: [`plan.md`](plan.md#week-4-why-the-dress-rehearsal-matters-most).
+
+**Built after the freeze.** Items that left this list, with what still bounds them.
+
+- **The undeclared policy sources** (2026-10-12). Twelve of the thirteen are
+  declared in `config/sources.yaml`, eleven in the retrieval corpus and the
+  EIOPA input spreadsheet as `context`; the six EU acts come from the
+  Publications Office's CELLAR because eur-lex answers every script with a WAF
+  challenge. Not declared: the Belgian Insurance Act (robots.txt disallows its
+  ELI), the SWD(2025) series beyond Spain's (CELEX numbers never recorded); the
+  EUCRA entry is its landing page, not the report.
+  [`decisions.md`, 2026-10-12](decisions.md#2026-10-12--twelve-of-the-thirteen-cited-policy-sources-are-declared-and-one-declared-pdf-was-never-indexed).
 
 ## 3. What a Member State or the Commission would still have to do
 
@@ -277,7 +289,10 @@ Only what the repository shows.
   pulled, so a container started without `.env` asks for the same name. The
   check skips every `access: api` source, so the Risk Data Hub is covered only
   through its cache check, and the basin districts and the CDS files through
-  their own WARN checks.
+  their own WARN checks. Since 2026-10-12, 64 files are declared: the twelve
+  policy documents added that day are missing until the next fetch, and the
+  arXiv paper is now expected as `nist_robust_ai_alignment_limits.pdf`, so the
+  check stays BLOCKED until `python -m src.fetch` has run once more.
   [`scripts/check_offline_readiness.py`](../scripts/check_offline_readiness.py),
   root [`README.md`](../README.md).
 - **Dead configuration keys.** `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` and

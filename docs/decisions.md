@@ -1479,3 +1479,63 @@ completes, the four imports load, and the readiness script with no data says
 Also: the test counts rewritten to 551 on 10 October sat under two sentences
 still dated 8 October; re-measured today (551 passed) and dated so.
 
+
+## 2026-10-12 — twelve of the thirteen cited policy sources are declared, and one declared PDF was never indexed
+
+`config/sources.yaml`, `src/fetch.py` (`target_of`, `suffix:`),
+`scripts/check_offline_readiness.py`, `tests/test_fetch.py`, `docs/policy_context.md`
+
+**What.** `policy_context.md` cited thirteen documents that `sources.yaml` never
+declared, so the retrieval layer could not cite them back. Twelve are now
+declared: eleven in `policy_corpus`, and the EIOPA input spreadsheet in `context`
+because `rag._read` does not read `.xlsx`. Each URL was checked once on
+2026-10-12 through `src.fetch`'s own robots gate and headers, reading only the
+first 4 KiB of the body.
+
+**Where the six EU acts come from, and why.** Every eur-lex URL for them answered
+**HTTP 202** with the 2,035-byte AWS WAF challenge, which the fetcher refuses -
+the same wall the existing `floods_directive` and `ai_act` entries sit behind.
+The Publications Office's CELLAR (`publications.europa.eu/resource/celex/<CELEX>`)
+answered **303 then 200** with the English XHTML of each act, under a readable
+robots.txt that allows the path, so no derogation was needed. A CELEX with a
+parenthesis has to be percent-encoded there (`32023H0215%2801%29`; the raw form
+is 404). eur-lex stays on each entry as the human-readable `landing`.
+
+**Not declared, and why.** The Belgian Insurance Act of 4 April 2014: its ELI on
+www.ejustice.just.fgov.be is **disallowed by that host's robots.txt**, and a
+declared file the fetcher must refuse would hold the offline check at BLOCKED
+for good. (The verification script requested that page once after the robots
+gate had said "disallowed"; nothing was stored, and the fetcher itself never
+reaches it.) The SWD(2025) series beyond Spain's SWD(2025) 24, whose CELEX
+numbers were never recorded. EUCRA is declared as its landing page; the report
+PDF was not resolved.
+
+**A defect found by the new guard, and fixed.** `_target_path` names a file from
+the URL's suffix, and `nist_robust_ai_alignment_limits` is
+`https://arxiv.org/pdf/2512.10100` - stored as
+`nist_robust_ai_alignment_limits.10100`. `rag._read` picks its parser by suffix
+and returns "" for that one. Measured on the copy on disk (447,655 B, a valid
+`%PDF-1.7`): **0 characters and 0 passages** under its stored name, **25,592
+characters and 32 passages** read as `.pdf`. The paper the responsible-AI
+section quotes for "no finite set of guardrails is robust" was declared,
+fetched, fingerprinted in the manifest and never in the index. An entry may now
+declare `suffix:`; that one says `.pdf`, as do the two EIOPA endpoints whose
+paths name no type (`/document/download/<uuid>_en`). A test now requires every
+`policy_corpus` file to land in a format `rag._read` parses.
+
+**What a reader must know.** The retrieval corpus grows from 13 to 24 entries
+once `python -m src.fetch` runs; until then the twelve new files are missing and
+the offline check says so. The arXiv paper is now expected under `.pdf`, so the
+next fetch downloads it again (447,655 B) - or rename the existing file to skip
+that. Declared inputs move 42 -> 54, with a verification date 34 -> 46 and a
+`licence:` 11 -> 17 (the six EU acts carry Commission Decision 2011/833/EU);
+files 52 -> 64. The byte totals quoted in the docs are the 6 October
+`Content-Length`; most of the new hosts send none, so those totals are a floor.
+
+**NOT a measurement change for any exposure figure.** Nothing under `src/`
+that computes a figure was touched; 39 fixed API requests (meta, exposure at every
+period, context, 24 vulnerability rankings) are byte-identical before and after
+on a frozen copy of the real tables.
+
+Tests: 569 before, 586 after (17 new in `tests/test_fetch.py`), all passing in
+WSL2 with no `data/`.

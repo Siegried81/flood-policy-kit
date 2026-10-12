@@ -28,8 +28,10 @@ YAML, the YAML is right.
 The `geodata` section declares **27 entries**, which expand to **49 jobs**; **37**
 of those are files to download (**≈3.78 GiB**) and the other **12** are
 `access: api` endpoints queried at runtime, so nothing lands on disk for them.
-With the `policy_corpus` (**13** entries) and `context` (**2**) sections, every one
-of them a `scrape`, the whole fetch is **52 files** and **≈3.82 GiB**. **Four** entries resolve to several files
+With the `policy_corpus` (**24** entries) and `context` (**3**) sections, every one
+of them a `scrape`, the whole fetch is **64 files** and **≈3.82 GiB**, a floor: the
+twelve policy documents declared on 2026-10-12 are not in the byte total, because
+most of their hosts send no `Content-Length`. **Four** entries resolve to several files
 each — `jrc_flood_hazard` 13 (nine return periods, two companion masks, the README
 and the CHANGELOG), `hanze_flood_impacts` 7, `cems_emsr518_belgium_2021` 4 and
 `ghsl_pop_100m_tiles` 2 — so `src.fetch.expand()` turns one declared entry into one
