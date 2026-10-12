@@ -1479,3 +1479,72 @@ completes, the four imports load, and the readiness script with no data says
 Also: the test counts rewritten to 551 on 10 October sat under two sentences
 still dated 8 October; re-measured today (551 passed) and dated so.
 
+
+## 2026-10-12 — density and household income reach the context table, and GDP reads a year that covers the map
+
+**NEW COLUMNS in `context.parquet` (not `exposure.parquet`).**
+
+- `pop_density_per_km2` — persons per km2, `demo_r_d3dens`, unit pinned to
+  `PER_KM2`, NUTS3, year 2024: **1,279 of 1,345 regions**. The 66 blanks are a
+  vintage mismatch (the 2024 values sit on NUTS 2021 codes: the eight new Belgian
+  codes, ITG2D-H, six Croatian, two Estonian, Serbia, Kosovo, most of Norway),
+  not empty regions.
+- `household_income_pps_per_hab` — net disposable income of private households
+  per inhabitant, `nama_10r_2hhinc` pinned to `na_item=B6N`, `direct=BAL`,
+  `unit=PPS_EU27_2020_HAB`, year 2023, **NUTS2 applied to its NUTS3 children**:
+  **1,165 regions**, the EU-27 and nothing else. PPS rather than euros because the
+  column exists to compare regions across countries; the cube carries five units
+  under one code, so the unit is in the name.
+- Beside them, as text: `pop_density_year`, `pop_density_flag`,
+  `household_income_year`, `household_income_flag` (Eurostat's `p`/`e`/`b`) and
+  `household_income_level`.
+
+**Why context and not indicators.** Density says how concentrated people are,
+income how much a household has to recover with; neither is put into the
+vulnerability index by this change. `api/main.py::vulnerability_indicators` scans
+the numeric columns of `exposure.parquet`, so placing them there would have made
+them index terms by accident. Adding either to the index is a weighting decision
+for a human, and the index is unchanged.
+
+**MEASUREMENT CHANGE — `gdp_meur` / `gdp_meur_year`, and the rule behind them.**
+`demographics._latest` took "the most recent year with any value". Eurostat
+releases a year country by country, so for GDP that was 2024 with **536**
+regions published, against **1,307** for 2023. The frozen table carries
+`gdp_meur` for **524** of 1,345 regions, all 2024. The entry of 2026-10-07 read
+the gap as "Eurostat publishes it for 536 NUTS3 units", which was the selection
+rule and not the publisher. The rule is now: walking back from the newest year,
+take the first one that covers at least 90 % of the regions the year before it
+covers. A rebuild reads GDP from **2023 for 1,292 regions**.
+
+The rule is compared with the year before, not with the best year ever, because
+older years carry codes from earlier NUTS vintages and the United Kingdom: the
+age cube has 1,589 regions in 2019 and 1,338 in 2025, and a best-year floor sent
+`share_over_65` back to 2019 in the first draft of this change. Caught by the
+proof below and not shipped.
+
+**What did not move.** `share_over_65` and `poverty_rate` (and their year and
+level columns) recomputed with the new rule from the same cached cubes are
+**identical** to the columns in the frozen `exposure.parquet`, value for value,
+for all 1,345 regions: both stay on 2025. `exposure.parquet` was not rebuilt.
+
+**The rebuild, diffed against the frozen table.** `scripts/build_context.py
+--stripes 72` on this branch, written to a new file
+(`data/processed/context.eurostat-12-10.parquet`; the frozen `context.parquet`
+is untouched), 43 min, peak 8.8 GB resident. 1,345 rows, 36 columns against 29.
+Column by column against the frozen table: the basin, APSFR and climate columns
+and `built_total_m2` are **identical**; `exposed_built_m2_rp100` and
+`built_share_exposed_rp100` differ in 63 and 60 rows by at most **5.0e-10
+relative** (0.0006 m2), floating-point summation order between two runs of the
+same windowed code, not a change of meaning; `gdp_meur` and `gdp_meur_year`
+differ in 1,292 rows, which is the change above. To adopt it, replace
+`context.parquet` with the new file or rebuild in place.
+
+**And a script bug the rebuild found.** `--out` given as a relative path wrote
+the table and then raised in `relative_to(ROOT)` while printing the summary:
+exit 1, no notes printed. The summary now prints the path as given when it is
+not under the repository; `tests/test_build_context.py` pins it.
+
+Tests (WSL, Python 3.14, no data/): **569 passed before, 577 after** - six in
+`tests/test_demographics.py`, two in the new `tests/test_build_context.py`. The
+per-file table in `technical_deep_dive.md` section 7 was re-measured and three
+stale rows corrected.

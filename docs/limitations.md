@@ -124,6 +124,15 @@ rebuilt. The findings and recommendations themselves are in
   NUTS3 child; `share_over_65` is a fraction (0.027 to 0.372). Neither column
   name says so. [`decisions.md`, 2026-10-08 "two indicators, two scales"](decisions.md#2026-10-08--two-indicators-two-scales-and-that-is-deliberate),
   [`scope.md`](scope.md#demographics-eurostat-not-statbel).
+- **Density and household income are context, and one of them is NUTS2.**
+  `pop_density_per_km2` (`demo_r_d3dens`, 2024) and
+  `household_income_pps_per_hab` (`nama_10r_2hhinc`, net disposable income in
+  PPS per inhabitant, 2023) sit in `context.parquet`, outside the index; adding
+  either to it is a weighting decision. Income is NUTS2 applied to its NUTS3
+  children and covers the EU-27 only (1,165 of 1,345 regions); density is
+  published on NUTS 2021 codes and leaves 66 NUTS 2024 regions blank.
+  [`src/demographics.py`](../src/demographics.py) `context_indicators`,
+  [`decisions.md`, 2026-10-12](decisions.md#2026-10-12--density-and-household-income-reach-the-context-table-and-gdp-reads-a-year-that-covers-the-map).
 - **Who is not in the data.** Undocumented residents, people in temporary
   housing and seasonal workers are absent from a residential population grid.
   The gap is stated, not estimated. [`strategy.md`](strategy.md#the-question-most-teams-will-not-ask),
@@ -178,9 +187,6 @@ written intent rather than from memory.
   declared in `config/sources.yaml` with `DECLARED, NOT YET USED` in their
   caveat; no module reads either, and no figure may be quoted from them until
   one does. Design: [`datasets.md`](datasets.md#declared-and-not-yet-used-natura-2000-corine-land-cover).
-- **Two further Eurostat indicators.** Population density (`demo_r_d3dens`) and
-  disposable household income (`nama_10r_2hhinc`) are named as candidates and
-  not yet declared or called. Design: [`scope.md`](scope.md#demographics-eurostat-not-statbel).
 - **The full CDS ensemble.** Two of the eight offered simulations are on disk;
   `scripts/fetch_cds_member.py` fetches one member at a time and verifies the
   filename against the request. Design: [`datasets.md`](datasets.md#copernicus-cds--hydrology-projections--verified--and-unsupported),
@@ -287,11 +293,11 @@ Only what the repository shows.
   feature. [`decisions.md`, 2026-10-08 "the draft tab could never have worked"](decisions.md#2026-10-08--the-draft-tab-could-never-have-worked-for-three-reasons),
   [`decisions.md`, 2026-10-08 "there was no map"](decisions.md#2026-10-08--the-first-scored-deliverable-was-missing-there-was-no-map),
   [`requirements.txt`](../requirements.txt).
-- **Test counts are typed by hand.** The per-file table in
-  `technical_deep_dive.md` §7 lists 22 files summing to 473 and omits
-  `tests/test_svgmap.py`; `pytest --collect-only` on 2026-10-08 collects 513
-  across 23 files. The total in the same section is right and the rows are
-  stale. [`technical_deep_dive.md` §7](technical_deep_dive.md#7-the-test-suite).
+- **Per-file test counts are typed by hand.** The total in
+  `technical_deep_dive.md` §7 is filled by `scripts/docs_numbers.py`; the
+  per-file rows are not, and they drift: the table of 10 October had three
+  wrong or missing rows by 12 October. Re-measured that day (27 files, summing
+  to the total); re-measure again after any test change. [`technical_deep_dive.md` §7](technical_deep_dive.md#7-the-test-suite).
 - **Whether the suite runs on Windows depends on a policy that flipped twice.**
   Smart App Control blocked `rasterio`'s DLL on 2026-10-07 and allowed it again
   the next morning with nothing reinstalled; the WSL2 venv is the route that

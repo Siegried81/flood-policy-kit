@@ -25,8 +25,8 @@ python -m src.fetch          52 files, ≈3.82 GiB, idempotent, robots-aware
 build_exposure.py  build_context.py  build_geometry.py
  hazard ×           built-up, basins,  boundaries →
  population         future discharge,  simplified polygons
- per NUTS3 × RP     GDP, per NUTS3
- + Eurostat
+ per NUTS3 × RP     GDP, density,
+ + Eurostat         income, per NUTS3
    indicators
         │               │              │
         ▼               ▼              ▼
@@ -326,8 +326,8 @@ down in advance.
 
 ## 7. The test suite
 
-**<!-- numbers:tests_collected -->569<!-- /numbers --> tests, offline**: no network, no model, no key. Measured 11 October 2026 on
-Windows: all <!-- numbers:tests_collected -->569<!-- /numbers --> collect and pass, nothing deselected. Do not quote that as a
+**<!-- numbers:tests_collected -->577<!-- /numbers --> tests, offline**: no network, no model, no key. Measured 11 October 2026 on
+Windows: all <!-- numbers:tests_collected -->577<!-- /numbers --> collect and pass, nothing deselected. Do not quote that as a
 property of the platform — Smart App Control moved to enforcement on 7 October
 2026 and refused rasterio's unsigned DLLs, which left 433 collectable and 431
 passing on Windows while WSL2 ran the lot; by the next morning it allowed the
@@ -343,19 +343,21 @@ block that `scripts/docs_numbers.py --write` fills from `pytest --collect-only`,
 and `tests/test_docs_numbers.py` fails the suite when any marked block in the
 docs disagrees with the repository. Edit the prose, never the digit.
 
-Per-file counts measured 10 October 2026 with
+Per-file counts measured 12 October 2026 with
 `pytest --collect-only -q | grep '::' | cut -d: -f1 | sort | uniq -c`; they sum to the
-marked total above. Twenty-five files — the previous table listed twenty-two and
-summed to 473, a figure that had survived three suite changes by being typed.
+marked total above. Twenty-seven files. The table of 10 October listed
+twenty-five and had already drifted (`test_api.py` 48 for 50, `test_rag.py` 31
+for 35, `test_mcp_server.py` absent), the same failure as the twenty-two-row
+table before it that summed to 473: per-file rows are typed, so re-measure them.
 
 | File | Tests | Guards |
 |---|---|---|
 | `test_offline_readiness.py` | 52 | the demo runs with the Wi-Fi off: the three verdicts, `--strict`, a rejected file is not present, the two caches `src.fetch` does not fill |
 | `test_validate.py` | 50 | the scoring grid, the three metrics, `None` vs `0.0` |
-| `test_api.py` | 48 | the eleven routes, the 404s that name their builder, the JSX guards |
+| `test_api.py` | 50 | the eleven routes, the 404s that name their builder, the JSX guards |
 | `test_streamlit_app.py` | 47 | the fallback UI, the translation tab, the climate and coverage caveats |
 | `test_fetch.py` | 42 | robots, idempotency, multi-file expansion, a stale rejection page is quarantined, colliding paths are refused |
-| `test_rag.py` | 31 | cite-or-refuse |
+| `test_rag.py` | 35 | cite-or-refuse |
 | `test_losses.py` | 29 | the RDH euro vintages and the levelling |
 | `test_basins.py` | 27 | the shared-basin layer: the declared crosswalk, the sliver floor |
 | `test_exposure.py` | 23 | the two modes, `nodata_means_dry`, the masks, the build checkpoint |
@@ -366,13 +368,15 @@ summed to 473, a figure that had survived three suite changes by being typed.
 | `test_toon_io.py` | 15 | the compact table encoding for prompts, and a tokenizer that cannot fetch its table says so |
 | `test_apsfr.py` | 13 | the two reporting cycles, the dissolve, the claim it must not make |
 | `test_svgmap.py` | 16 | the offline choropleth: quantile classes, holes kept, the outermost regions out of the extent, hatching where the chains disagree, a legend that names its sixths and stays inside the viewBox |
-| `test_demographics.py` | 12 | the sparse cube, the overlapping age buckets, the NUTS2 caveat |
+| `test_demographics.py` | 18 | the sparse cube, the overlapping age buckets, the NUTS2 caveat, a thinly published newest year, density and income pinned to their units and kept out of the index |
 | `test_translate.py` | 12 | a translated figure never moves |
 | `test_events.py` | 11 | the coverage blind-spot probe |
 | `test_stripes.py` | 9 | the figure does not depend on the window count |
 | `test_assets.py` | 8 | the built-up surface: the archive, the unit, the share |
 | `test_docs_numbers.py` | 10 | a number typed in a doc that no longer matches the code fails the suite |
 | `test_legislation.py` | 7 | every legal citation has a CELEX and a URL, and `policy_answer.md` cites no article the registry lacks |
+| `test_mcp_server.py` | 12 | the three intent-shaped MCP tools, answered in flat TOON |
+| `test_build_context.py` | 2 | the context build does not fail after writing its table |
 | `test_build_geometry.py` | 5 | the join key, the projection, the simplification |
 | `test_data_io.py` | 3 | the CRS engine is alive |
 
@@ -388,9 +392,9 @@ zonal statistic is the right arithmetic on the wrong piece of Europe. Measured o
 
 | Claim | Source |
 |---|---|
-| <!-- numbers:tests_collected -->569<!-- /numbers --> tests | `scripts/docs_numbers.py --write`, which runs `pytest --collect-only` and rewrites the marked blocks; the per-file counts are typed by hand |
+| <!-- numbers:tests_collected -->577<!-- /numbers --> tests | `scripts/docs_numbers.py --write`, which runs `pytest --collect-only` and rewrites the marked blocks; the per-file counts are typed by hand |
 | 52 files, ≈3.82 GiB | `src.fetch.expand()` over `config/sources.yaml` |
-| <!-- numbers:sources_declared -->42<!-- /numbers --> declared inputs, <!-- numbers:sources_verified -->34<!-- /numbers --> with a verification date, <!-- numbers:sources_licensed -->11<!-- /numbers --> with an explicit `licence:` | `scripts/docs_numbers.py` over `config/sources.yaml`: entries with an `id`; `verified` not null; `licence` non-empty |
+| <!-- numbers:sources_declared -->44<!-- /numbers --> declared inputs, <!-- numbers:sources_verified -->36<!-- /numbers --> with a verification date, <!-- numbers:sources_licensed -->13<!-- /numbers --> with an explicit `licence:` | `scripts/docs_numbers.py` over `config/sources.yaml`: entries with an `id`; `verified` not null; `licence` non-empty |
 | 1,345 NUTS3 polygons | the GISCO NUTS 2024 file itself |
 | the 0.25% stripe discrepancy | two continental RP100 builds, 6 October 2026 |
 | 4.85% of cells carry a value | a 1,468,800-cell window of Belgian land, RP100 |

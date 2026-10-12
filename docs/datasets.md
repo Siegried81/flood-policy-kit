@@ -353,7 +353,9 @@ truth itself, and that belongs in the brief.
 | GISCO LAU 2024 | `LAU_RG_01M_2024_3035.shp.zip`, 39 MB | Pan-European; filter `CNTR_CODE == "BE"` → **581** communes. `GISCO_ID` = `BE_<NIS5>` |
 | Eurostat population by age | `demo_r_pjangrp3` | NUTS3, every country. Checked live 2026-10-06: BE332, sex=T, age=TOTAL → 637,220 |
 | Eurostat at-risk-of-poverty | `ilc_li41` | **NUTS2 only.** Checked live 2026-10-06: BE33 → 14.6 — `BE33` being a NUTS2 code is that caveat confirmed, not assumed |
-| Eurostat GDP | `nama_10r_3gdp` | NUTS3. Checked live 2026-10-06: BE332 = 26,435.29 MIO_EUR, status `p` (provisional). **Pin the unit** — `MIO_EUR`, `MIO_PPS` and `EUR_HAB` are three different numbers, and mixing them is silent |
+| Eurostat GDP | `nama_10r_3gdp` | NUTS3. Checked live 2026-10-06: BE332 = 26,435.29 MIO_EUR, status `p` (provisional). **Pin the unit** — `MIO_EUR`, `MIO_PPS` and `EUR_HAB` are three different numbers, and mixing them is silent. Read from 2023 since 2026-10-12: 2024 is published for 536 NUTS3 units only |
+| Eurostat population density | `demo_r_d3dens` | NUTS3, `PER_KM2`. Checked live 2026-10-12: BE332 = 808.5 (2024). 2024 sits on NUTS 2021 codes, so 66 of the 1,345 NUTS 2024 regions are blank (8 new Belgian codes, ITG2D-H, HR, EE, NO, RS, XK) - a vintage mismatch, not an empty region. Context, not an indicator |
+| Eurostat household income | `nama_10r_2hhinc` | **NUTS2 only.** Pinned `na_item=B6N`, `direct=BAL`, `unit=PPS_EU27_2020_HAB`. Checked live 2026-10-12: BE33 = 21,300 PPS per inhabitant (2023; 2024 covers 63 of 296 NUTS2 regions). EU-27 only. Context, not an indicator |
 | Statbel population | `TF_SOC_POP_STRUCT_2026` | **565** communes, 11,867,634 people at 2026-01-01, single years of age 0–100 |
 | Statbel income | `TF_PSNL_INC_TAX_MUNTY` | 2005–**2023** only, on the **pre-merger** 581 geography |
 
