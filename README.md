@@ -134,7 +134,7 @@ refused `rasterio`'s own GDAL build, which no pin fixed; by 2026-10-08 it allowe
 the same wheel again with nothing reinstalled. **The policy moves both ways, so
 measure rather than believe either state** — measured 2026-10-12, it blocks
 `import rasterio` again, so the three raster test modules do not collect on
-Windows, while the WSL2 venv runs the whole suite: **<!-- numbers:tests_collected -->650<!-- /numbers --> passed, nothing
+Windows, while the WSL2 venv runs the whole suite: **<!-- numbers:tests_collected -->685<!-- /numbers --> passed, nothing
 deselected**. The WSL2 venv stays, because it is the only route that does
 not depend on the policy's mood and it is where a continental raster build
 belongs. **The `app` image was built and run on 2026-10-12:** `rasterio`,
@@ -194,7 +194,7 @@ never published; build it locally.
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m pytest -q           # <!-- numbers:tests_collected -->650<!-- /numbers --> tests, offline: no network, no model
+.venv/bin/python -m pytest -q           # <!-- numbers:tests_collected -->685<!-- /numbers --> tests, offline: no network, no model
                                         # Measured 2026-10-12 in WSL2, nothing
                                         # deselected. Smart App Control blocks
                                         # rasterio on Windows some days and not

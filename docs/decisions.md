@@ -1811,3 +1811,39 @@ key in `~/.cdsapirc` (or `CDSAPI_URL` + `CDSAPI_KEY`), then
 
 Tests (WSL, Python 3.14, no data/): **569 passed before, 579 after** - ten new
 tests in `tests/test_climate.py`, all offline, the CDS client mocked.
+
+## 2026-10-12 — the three data layers on one context table
+
+The Eurostat, Natura 2000 and CDS-ensemble branches are merged onto `main` as it
+stood after the units rename, and `scripts/build_context.py --stripes 72` was
+run once on the merged tree, to the NEW file
+`data/processed/context.data-layers-12-10.parquet` (47 min, peak 9.0 GB
+resident). The frozen `context.parquet` and `exposure.parquet` are untouched.
+
+**The table.** 1,345 rows, 46 columns: the 29 of the frozen table, the seven
+density and income columns, the four Natura 2000 columns, and
+`change_pct_ensemble_p25/p75` for each of the three periods.
+
+**What moved, column by column against the frozen table.** Basins, APSFR,
+`built_total_m2` and every existing climate column are identical.
+`exposed_built_m2_rp100` and `built_share_exposed_rp100` differ in 63 and 60
+rows by at most 5.0e-10 relative (summation order). `gdp_meur` and
+`gdp_meur_year` differ in 1,292 rows: the documented year change above (2023,
+1,292 regions). Nothing else. The Natura 2000 columns are identical to the
+single-branch pass, and the density, income and GDP columns to the
+single-branch rebuild.
+
+**Read without change.** `/api/context` serves all 46 columns (checked through
+the FastAPI test client on the new file: BE332 reads 45.0 km2 of Natura land,
+808.5 persons per km2, 21,300 PPS, GDP 2023), so the MCP `profile_regions` tool,
+which flattens that route, carries them too. `/api/meta` still offers exactly
+`exposed_pop`, `share_over_65` and `poverty_rate_pct` as indicators: nothing new
+reaches the vulnerability index. The Streamlit context tab shows the quartiles
+in its climate table and does not yet show density, income or Natura.
+
+**To adopt it**, from the repository root (PowerShell), keeping the old table:
+
+    Copy-Item data\processed\context.parquet data\processed\context.parquet.backup-20261012
+    Copy-Item data\processed\context.data-layers-12-10.parquet data\processed\context.parquet
+
+Tests (WSL, Python 3.14, no `data/`): **650 on `main`, 685 after the merge**.

@@ -341,8 +341,8 @@ down in advance.
 
 ## 7. The test suite
 
-**<!-- numbers:tests_collected -->650<!-- /numbers --> tests, offline**: no network, no model, no key. Measured 12 October 2026 in
-WSL2: all <!-- numbers:tests_collected -->650<!-- /numbers --> collect and pass, nothing deselected; the same day Windows
+**<!-- numbers:tests_collected -->685<!-- /numbers --> tests, offline**: no network, no model, no key. Measured 12 October 2026 in
+WSL2: all <!-- numbers:tests_collected -->685<!-- /numbers --> collect and pass, nothing deselected; the same day Windows
 blocked `rasterio` again. Do not quote either as a property of the platform — Smart App Control moved to enforcement on 7 October
 2026 and refused rasterio's unsigned DLLs, which left 433 collectable and 431
 passing on Windows while WSL2 ran the lot; by the next morning it allowed the
@@ -360,7 +360,7 @@ docs disagrees with the repository. Edit the prose, never the digit.
 
 Per-file counts measured 12 October 2026 with
 `pytest --collect-only -q | grep '::' | cut -d: -f1 | sort | uniq -c`; they sum to the
-marked total above. Twenty-seven files — an earlier table listed twenty-two and
+marked total above. Twenty-nine files — an earlier table listed twenty-two and
 summed to 473, a figure that had survived three suite changes by being typed.
 
 | File | Tests | Guards |
@@ -383,16 +383,14 @@ summed to 473, a figure that had survived three suite changes by being typed.
 | `test_mcp_server.py` | 12 | the three intent-based MCP tools and their flat TOON answers |
 | `test_apsfr.py` | 13 | the two reporting cycles, the dissolve, the claim it must not make |
 | `test_svgmap.py` | 16 | the offline choropleth: quantile classes, holes kept, the outermost regions out of the extent, hatching where the chains disagree, a legend that names its sixths and stays inside the viewBox |
-| `test_demographics.py` | 15 | the sparse cube, the overlapping age buckets, the NUTS2 caveat, the unit in the name and the legacy names |
+| `test_demographics.py` | 21 | the sparse cube, the overlapping age buckets, the NUTS2 caveat, the unit in the name and the legacy names, a thinly published newest year, density and income pinned to their units |
 | `test_translate.py` | 12 | a translated figure never moves |
 | `test_events.py` | 11 | the coverage blind-spot probe |
 | `test_stripes.py` | 9 | the figure does not depend on the window count |
 | `test_environment.py` | 17 | Natura 2000 on flood-prone ground: the union not the sum, true cell areas, the masks, window-size invariance, not measured is not zero |
-| `test_mcp_server.py` | 12 | the three intent-shaped MCP tools, answered in flat TOON |
 | `test_assets.py` | 8 | the built-up surface: the archive, the unit, the share |
 | `test_docs_numbers.py` | 10 | a number typed in a doc that no longer matches the code fails the suite |
 | `test_legislation.py` | 7 | every legal citation has a CELEX and a URL, and `policy_answer.md` cites no article the registry lacks |
-| `test_mcp_server.py` | 12 | the three intent-shaped MCP tools, answered in flat TOON |
 | `test_build_context.py` | 2 | the context build does not fail after writing its table |
 | `test_build_geometry.py` | 5 | the join key, the projection, the simplification |
 | `test_data_io.py` | 3 | the CRS engine is alive |
@@ -409,9 +407,9 @@ zonal statistic is the right arithmetic on the wrong piece of Europe. Measured o
 
 | Claim | Source |
 |---|---|
-| <!-- numbers:tests_collected -->650<!-- /numbers --> tests | `scripts/docs_numbers.py --write`, which runs `pytest --collect-only` and rewrites the marked blocks; the per-file counts are typed by hand |
+| <!-- numbers:tests_collected -->685<!-- /numbers --> tests | `scripts/docs_numbers.py --write`, which runs `pytest --collect-only` and rewrites the marked blocks; the per-file counts are typed by hand |
 | 65 files, ≈5.09 GiB | `src.fetch.expand()` over `config/sources.yaml`; the bytes are the 6 October `Content-Length` plus the Natura 2000 GeoPackage measured on 12 October, a floor since twelve documents were added on 12 October |
-| <!-- numbers:sources_declared -->54<!-- /numbers --> declared inputs, <!-- numbers:sources_verified -->46<!-- /numbers --> with a verification date, <!-- numbers:sources_licensed -->17<!-- /numbers --> with an explicit `licence:` | `scripts/docs_numbers.py` over `config/sources.yaml`: entries with an `id`; `verified` not null; `licence` non-empty |
+| <!-- numbers:sources_declared -->57<!-- /numbers --> declared inputs, <!-- numbers:sources_verified -->49<!-- /numbers --> with a verification date, <!-- numbers:sources_licensed -->20<!-- /numbers --> with an explicit `licence:` | `scripts/docs_numbers.py` over `config/sources.yaml`: entries with an `id`; `verified` not null; `licence` non-empty |
 | 1,345 NUTS3 polygons | the GISCO NUTS 2024 file itself |
 | the 0.25% stripe discrepancy | two continental RP100 builds, 6 October 2026 |
 | 4.85% of cells carry a value | a 1,468,800-cell window of Belgian land, RP100 |

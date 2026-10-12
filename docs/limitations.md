@@ -343,7 +343,7 @@ Only what the repository shows.
 - **Per-file test counts are typed by hand.** The total in
   `technical_deep_dive.md` §7 is filled by `scripts/docs_numbers.py`; the
   per-file rows are not, and they drift: the table of 10 October had three
-  wrong or missing rows by 12 October. Re-measured that day (27 files, summing
+  wrong or missing rows by 12 October. Re-measured that day on the merged tree (29 files, summing
   to the total); re-measure again after any test change. [`technical_deep_dive.md` §7](technical_deep_dive.md#7-the-test-suite).
 - **Whether the suite runs on Windows depends on a policy that flipped twice.**
   Smart App Control blocked `rasterio`'s DLL on 2026-10-07 and allowed it again
