@@ -909,6 +909,71 @@ def test_the_tab_lists_the_regions_with_no_declared_area():
     )
 
 
+def _context_with_people_and_natura() -> pd.DataFrame:
+    """The context fixture plus the density, income and Natura 2000 columns.
+
+    BE33 stands for a region outside the EU-27: no Natura figure at all, which
+    must stay out of both sums rather than count as a protected area of zero.
+    """
+    return _context_table().assign(
+        pop_density_per_km2=[800.0, 50.0, 300.0],
+        pop_density_year=["2024", "2024", "2024"],
+        household_income_pps_per_hab=[21_300.0, 18_000.0, None],
+        household_income_year=["2023", "2023", None],
+        household_income_level=["NUTS2, applied to its NUTS3 children"] * 2 + [None],
+        natura2000_km2=[100.0, 300.0, None],
+        natura2000_flooded_km2_rp100=[10.0, 30.0, None],
+        natura2000_flooded_share_rp100=[0.1, 0.1, None],
+        natura2000_grid_coverage=[1.0, 1.0, None],
+    )
+
+
+def test_the_tab_shows_natura_2000_as_an_area_on_flood_prone_ground():
+    """Natura 2000 reached `context.parquet` with nothing on the page to read it.
+    The headline sums the two areas over the regions that carry both, so a
+    region outside the network adds nothing rather than a zero denominator."""
+    app_test = _run(_nested_table(), context=_context_with_people_and_natura())
+    assert app_test.exception == []
+    assert "not a harm" in _texts(app_test)
+    headline = [m for m in app_test.metric if "Natura 2000" in (m.label or "")]
+    assert headline, "no Natura 2000 headline on the page"
+    assert headline[0].value == "40 of 400 km² (10.0%)"
+    shown = [d for d in app_test.dataframe
+             if "natura2000_flooded_km2_rp100" in getattr(d.value, "columns", [])]
+    assert shown, "no Natura 2000 table on the page"
+    assert list(shown[0].value["nuts_id"])[:2] == ["BE32", "BE31"]
+
+
+def test_the_tab_shows_density_and_income_with_the_nuts2_caveat():
+    """Density and income are context, not indicators: the page shows them in the
+    context tab, says income is NUTS2 repeated on its children, and the indicator
+    picker still never offers them."""
+    app_test = _run(_nested_table(), context=_context_with_people_and_natura())
+    assert app_test.exception == []
+    said = _texts(app_test)
+    assert "NUTS2" in said and "weighting decision" in said
+    shown = [d for d in app_test.dataframe
+             if "pop_density_per_km2" in getattr(d.value, "columns", [])]
+    assert shown, "no density and income table on the page"
+    table = shown[0].value
+    assert list(table["nuts_id"]) == ["BE31", "BE33", "BE32"]
+    assert "household_income_pps_per_hab" in table.columns
+    offered = [s for s in app_test.multiselect if s.label == "Indicators"][0].options
+    for leaked in ("pop_density_per_km2", "household_income_pps_per_hab",
+                   "natura2000_flooded_share_rp100"):
+        assert leaked not in offered
+
+
+def test_the_people_and_natura_sections_wait_for_their_columns():
+    """A context table built before these layers has none of their columns; the
+    page must open on it without either section, not raise a KeyError."""
+    app_test = _run(_nested_table(), context=_context_table())
+    assert app_test.exception == []
+    said = _texts(app_test)
+    assert "Natura 2000 on flood-prone ground" not in said
+    assert "Population density and household income" not in said
+
+
 def test_a_logged_entry_lands_inside_the_table_not_under_the_prose(tmp_path):
     """The defect: the form appended to the end of the FILE, and the log ends
     with prose. A new entry landed below the closing section, outside the table,

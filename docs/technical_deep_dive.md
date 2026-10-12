@@ -341,8 +341,8 @@ down in advance.
 
 ## 7. The test suite
 
-**<!-- numbers:tests_collected -->685<!-- /numbers --> tests, offline**: no network, no model, no key. Measured 12 October 2026 in
-WSL2: all <!-- numbers:tests_collected -->685<!-- /numbers --> collect and pass, nothing deselected; the same day Windows
+**<!-- numbers:tests_collected -->688<!-- /numbers --> tests, offline**: no network, no model, no key. Measured 12 October 2026 in
+WSL2: all <!-- numbers:tests_collected -->688<!-- /numbers --> collect and pass, nothing deselected; the same day Windows
 blocked `rasterio` again. Do not quote either as a property of the platform — Smart App Control moved to enforcement on 7 October
 2026 and refused rasterio's unsigned DLLs, which left 433 collectable and 431
 passing on Windows while WSL2 ran the lot; by the next morning it allowed the
@@ -369,7 +369,7 @@ summed to 473, a figure that had survived three suite changes by being typed.
 | `test_offline_readiness.py` | 52 | the demo runs with the Wi-Fi off: the three verdicts, `--strict`, a rejected file is not present, the two caches `src.fetch` does not fill |
 | `test_validate.py` | 50 | the scoring grid, the three metrics, `None` vs `0.0` |
 | `test_api.py` | 56 | the routes, the 404s that name their builder, the JSX guards, a table frozen before the units rename |
-| `test_streamlit_app.py` | 51 | the fallback UI, the translation and ask-the-table tabs, the climate and coverage caveats, a table frozen before the units rename |
+| `test_streamlit_app.py` | 54 | the fallback UI, the translation and ask-the-table tabs, the climate and coverage caveats, the density, income and Natura 2000 sections, a table frozen before the units rename |
 | `test_fetch.py` | 59 | robots, idempotency, multi-file expansion, a stale rejection page is quarantined, colliding paths are refused, the cited policy sources are declared and every corpus file lands in a format the index reads |
 | `test_rag.py` | 35 | cite-or-refuse |
 | `test_losses.py` | 29 | the RDH euro vintages and the levelling |
@@ -407,7 +407,7 @@ zonal statistic is the right arithmetic on the wrong piece of Europe. Measured o
 
 | Claim | Source |
 |---|---|
-| <!-- numbers:tests_collected -->685<!-- /numbers --> tests | `scripts/docs_numbers.py --write`, which runs `pytest --collect-only` and rewrites the marked blocks; the per-file counts are typed by hand |
+| <!-- numbers:tests_collected -->688<!-- /numbers --> tests | `scripts/docs_numbers.py --write`, which runs `pytest --collect-only` and rewrites the marked blocks; the per-file counts are typed by hand |
 | 65 files, ≈5.09 GiB | `src.fetch.expand()` over `config/sources.yaml`; the bytes are the 6 October `Content-Length` plus the Natura 2000 GeoPackage measured on 12 October, a floor since twelve documents were added on 12 October |
 | <!-- numbers:sources_declared -->57<!-- /numbers --> declared inputs, <!-- numbers:sources_verified -->49<!-- /numbers --> with a verification date, <!-- numbers:sources_licensed -->20<!-- /numbers --> with an explicit `licence:` | `scripts/docs_numbers.py` over `config/sources.yaml`: entries with an `id`; `verified` not null; `licence` non-empty |
 | 1,345 NUTS3 polygons | the GISCO NUTS 2024 file itself |
