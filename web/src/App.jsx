@@ -3,6 +3,7 @@ import { getExposure, getGeometry, getMeta } from "./api.js";
 import Choropleth from "./components/Choropleth.jsx";
 import ContextPanel from "./components/ContextPanel.jsx";
 import DraftPanel from "./components/DraftPanel.jsx";
+import SortableTable from "./components/SortableTable.jsx";
 import TranslationPanel from "./components/TranslationPanel.jsx";
 import VulnerabilityPanel from "./components/VulnerabilityPanel.jsx";
 
@@ -12,6 +13,19 @@ import VulnerabilityPanel from "./components/VulnerabilityPanel.jsx";
 // the server's 404, which names the script, rather than the tab disappearing
 // and the second table going unmentioned.
 const TABS = ["Exposure", "Context", "Vulnerability", "Draft", "Translation"];
+
+const finite = (value) => (Number.isFinite(value) ? value : null);
+
+// The share is read off the row when the server sent one, and derived
+// otherwise, so the column is present whichever metric the map is showing.
+// Without a denominator it stays blank rather than showing a 0% that would read
+// as "nobody".
+const shareOf = (row) =>
+  Number.isFinite(row.exposed_share)
+    ? row.exposed_share
+    : Number.isFinite(row.exposed_pop) && row.total_pop > 0
+      ? row.exposed_pop / row.total_pop
+      : null;
 
 export default function App() {
   const [meta, setMeta] = useState(null);
@@ -49,6 +63,18 @@ export default function App() {
     for (const row of exposure?.rows ?? []) map.set(row[exposure.key], row[metric]);
     return map;
   }, [exposure, metric]);
+
+  // Region names off the boundaries the map already loads, so every table can
+  // print "Wittmund" beside "DE94H" without another request or another column
+  // in the frozen tables. A code with no polygon falls back to itself.
+  const names = useMemo(() => {
+    const byCode = new Map();
+    for (const feature of geometry?.features ?? []) {
+      const code = feature.properties?.[meta?.key ?? "nuts_id"];
+      if (code) byCode.set(code, feature.properties?.name ?? code);
+    }
+    return byCode;
+  }, [geometry, meta]);
 
   const ranked = useMemo(
     () => [...(exposure?.rows ?? [])]
@@ -162,68 +188,40 @@ export default function App() {
               because it is what joins the row back to the boundaries and to
               Eurostat - traceability, not the label. Both fall back to the code
               so a table without the name columns still renders. */}
-          <table>
-            <thead>
-              <tr>
-                <th>region</th>
-                <th>country</th>
-                <th>residents</th>
-                <th>people exposed</th>
-                <th>share of residents</th>
-                <th>coverage</th>
-                <th>{exposure.key}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ranked.map((row) => {
-                // The share is read off the row when the server sent one, and
-                // derived otherwise, so the column is present whichever metric
-                // the map is showing. Without a denominator it stays blank
-                // rather than showing a 0% that would read as "nobody".
-                const share = Number.isFinite(row.exposed_share)
-                  ? row.exposed_share
-                  : Number.isFinite(row.exposed_pop) && row.total_pop > 0
-                    ? row.exposed_pop / row.total_pop
-                    : null;
-                return (
-                  <tr key={row[exposure.key]}>
-                    <td>{row.region ?? row[exposure.key]}</td>
-                    <td>{row.country_name ?? row.country ?? "—"}</td>
-                    <td>
-                      {Number.isFinite(row.total_pop)
-                        ? Math.round(row.total_pop).toLocaleString()
-                        : "—"}
-                    </td>
-                    <td>
-                      {Number.isFinite(row.exposed_pop)
-                        ? Math.round(row.exposed_pop).toLocaleString()
-                        : "not measured"}
-                    </td>
-                    <td>
-                      {share === null ? (
-                        "—"
-                      ) : (
-                        <>
-                          <span className="bar" style={{ width: `${share * 100}%` }} />
-                          {(share * 100).toFixed(1)}%
-                        </>
-                      )}
-                    </td>
-                    {/* hazard_coverage travels next to exposed_pop as its
-                        qualifier: a count over a partly observed region is a
-                        lower bound, and the reader has to be able to see that
-                        without opening the parquet. */}
-                    <td>
-                      {Number.isFinite(row.hazard_coverage)
-                        ? `${(row.hazard_coverage * 100).toFixed(0)}%`
-                        : "unknown"}
-                    </td>
-                    <td className="code">{row[exposure.key]}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <SortableTable
+            rows={ranked}
+            rowKey={(row) => row[exposure.key]}
+            columns={[
+              { label: "region", sort: (row) => row.region ?? row[exposure.key],
+                render: (row) => row.region ?? row[exposure.key] },
+              { label: "country", sort: (row) => row.country_name ?? row.country,
+                render: (row) => row.country_name ?? row.country ?? "—" },
+              { label: "residents", sort: (row) => finite(row.total_pop),
+                render: (row) => (Number.isFinite(row.total_pop)
+                  ? Math.round(row.total_pop).toLocaleString() : "—") },
+              { label: "people exposed", sort: (row) => finite(row.exposed_pop),
+                render: (row) => (Number.isFinite(row.exposed_pop)
+                  ? Math.round(row.exposed_pop).toLocaleString() : "not measured") },
+              { label: "share of residents", sort: shareOf,
+                render: (row) => {
+                  const share = shareOf(row);
+                  return share === null ? "—" : (
+                    <>
+                      <span className="bar" style={{ width: `${share * 100}%` }} />
+                      {(share * 100).toFixed(1)}%
+                    </>
+                  );
+                } },
+              // hazard_coverage travels next to exposed_pop as its qualifier: a
+              // count over a partly observed region is a lower bound, and the
+              // reader has to be able to see that without opening the parquet.
+              { label: "coverage", sort: (row) => finite(row.hazard_coverage),
+                render: (row) => (Number.isFinite(row.hazard_coverage)
+                  ? `${(row.hazard_coverage * 100).toFixed(0)}%` : "unknown") },
+              { label: exposure.key, sort: (row) => row[exposure.key],
+                render: (row) => row[exposure.key], className: "code" },
+            ]}
+          />
         </section>
       )}
 
@@ -238,10 +236,11 @@ export default function App() {
           returnPeriod={returnPeriod}
           returnPeriods={meta.return_periods}
           onReturnPeriod={setReturnPeriod}
+          names={names}
         />
       )}
 
-      {tab === "Context" && <ContextPanel />}
+      {tab === "Context" && <ContextPanel names={names} />}
 
       {tab === "Draft" && <DraftPanel />}
 
