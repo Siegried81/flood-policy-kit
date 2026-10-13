@@ -81,7 +81,7 @@ services:
     profiles: ["api"]
     command: ["python", "-m", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8010"]
     ports:
-      - "8010:8010"
+      - "127.0.0.1:8010:8010"  # API reachable from this machine only
     restart: unless-stopped
     healthcheck:
       # The image's own healthcheck probes Streamlit on 8501; this one probes the API.

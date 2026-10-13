@@ -27,12 +27,14 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import secrets
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -93,7 +95,7 @@ NON_INDICATOR_COLUMNS = frozenset({
 app = FastAPI(title="Flood exposure API", version="1.0")
 app.add_middleware(
     CORSMiddleware, allow_origins=DEV_ORIGINS, allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type"],
+    allow_headers=["Content-Type", "X-Approve-Token"],
 )
 
 
@@ -428,7 +430,7 @@ def vulnerability(req: VulnerabilityRequest) -> dict:
 
 
 @app.get("/api/search")
-def search(q: str, k: int = 5) -> dict:
+def search(q: str, k: int = Query(default=5, ge=1, le=rag.MAX_PASSAGES)) -> dict:
     """Retrieve supporting passages, or report the refusal.
 
     An empty `passages` with `refused: true` is a result, not an error: the corpus
@@ -611,18 +613,43 @@ def languages() -> dict:
     ]}
 
 
+# Cap on one approved section: generous for a brief, but a client cannot fill the
+# disk with a single request.
+MAX_APPROVED_CHARS = 50_000
+
+
 class ApproveRequest(BaseModel):
-    text: str = Field(min_length=1)
+    text: str = Field(min_length=1, max_length=MAX_APPROVED_CHARS)
+
+
+def _check_approver(token: str | None) -> None:
+    """Refuse an approval without the configured token.
+
+    Approve is the only route that writes, so it is the one worth guarding.
+    With FLOOD_APPROVE_TOKEN set, the caller must send it in X-Approve-Token
+    (compared in constant time, so timing does not leak it). Without it, any
+    caller that reaches the API may approve: the compose file publishes the API
+    on 127.0.0.1 only, so that is this machine. The client address is not
+    checked, because behind Docker's port-forward every caller, the React UI
+    on the host included, arrives from the bridge gateway and not from loopback.
+    """
+    expected = os.environ.get("FLOOD_APPROVE_TOKEN")
+    if expected and (not token or not secrets.compare_digest(token.encode(), expected.encode())):
+        raise HTTPException(status_code=403, detail="Invalid or missing X-Approve-Token.")
 
 
 @app.post("/api/approve")
-def approve(req: ApproveRequest) -> dict:
+def approve(
+    req: ApproveRequest,
+    x_approve_token: str | None = Header(default=None),
+) -> dict:
     """Append approved text to the brief. The only route that writes to it.
 
     The text is stored exactly as the human left it. It is deliberately not sent
     back to the model for polishing, because that hands the last word to the
     machine on a document a public authority may act on.
     """
+    _check_approver(x_approve_token)
     APPROVED.parent.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
     with APPROVED.open("a", encoding="utf-8") as handle:
