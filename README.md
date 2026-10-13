@@ -134,7 +134,7 @@ refused `rasterio`'s own GDAL build, which no pin fixed; by 2026-10-08 it allowe
 the same wheel again with nothing reinstalled. **The policy moves both ways, so
 measure rather than believe either state** — measured 2026-10-12, it blocks
 `import rasterio` again, so the three raster test modules do not collect on
-Windows, while the WSL2 venv runs the whole suite: **<!-- numbers:tests_collected -->690<!-- /numbers --> passed, nothing
+Windows, while the WSL2 venv runs the whole suite: **<!-- numbers:tests_collected -->702<!-- /numbers --> passed, nothing
 deselected**. The WSL2 venv stays, because it is the only route that does
 not depend on the policy's mood and it is where a continental raster build
 belongs. **The `app` image was built and run on 2026-10-12:** `rasterio`,
@@ -194,7 +194,7 @@ never published; build it locally.
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m pytest -q           # <!-- numbers:tests_collected -->690<!-- /numbers --> tests, offline: no network, no model
+.venv/bin/python -m pytest -q           # <!-- numbers:tests_collected -->702<!-- /numbers --> tests, offline: no network, no model
                                         # Measured 2026-10-12 in WSL2, nothing
                                         # deselected. Smart App Control blocks
                                         # rasterio on Windows some days and not
@@ -217,6 +217,8 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/streamlit run app/streamlit_app.py            # no build step
 .venv/bin/uvicorn api.main:app --port 8010              # + cd web && npm run dev
 ```
+
+`POST /api/approve` requires the `X-Approve-Token` header when `FLOOD_APPROVE_TOKEN` is set. Unset, it relies on the API being published on 127.0.0.1 only (`docker-compose.yml`).
 
 ### Agent access (MCP)
 
