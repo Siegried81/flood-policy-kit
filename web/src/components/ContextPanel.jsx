@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { getContext } from "../api.js";
+import SortableTable from "./SortableTable.jsx";
 
 /**
  * What qualifies an exposure figure, without being one.
@@ -39,7 +40,7 @@ const squareMetres = (value) =>
  */
 const countries = (value) => (Array.isArray(value) ? value.join(", ") : value);
 
-export default function ContextPanel() {
+export default function ContextPanel({ names = new Map() }) {
   const [body, setBody] = useState(null);
   const [period, setPeriod] = useState(null);
   const [error, setError] = useState(null);
@@ -70,6 +71,14 @@ export default function ContextPanel() {
   // MODEL_SPREAD_PP points apart, so the median is not a size to rank by.
   const uncertainColumn = `ensemble_size_uncertain_${suffix}`;
   const rows = body.rows ?? [];
+  // The name and the code head every table: the name to read, the code to
+  // join the row back to Eurostat. A code with no polygon names itself.
+  const regionColumns = [
+    { label: "region", sort: (row) => names.get(row[body.key]) ?? row[body.key],
+      render: (row) => names.get(row[body.key]) ?? row[body.key] },
+    { label: body.key, sort: (row) => row[body.key],
+      render: (row) => row[body.key], className: "code" },
+  ];
 
   const agreeing = rows
     .filter(
@@ -211,26 +220,19 @@ export default function ContextPanel() {
               is the average of two different stories, not a size to quote.
             </p>
           )}
-          <table>
-            <thead>
-              <tr>
-                <th>{body.key}</th>
-                <th>Median</th>
-                <th>Min</th>
-                <th>Max</th>
-              </tr>
-            </thead>
-            <tbody>
-              {agreeing.map((row) => (
-                <tr key={row[body.key]}>
-                  <td>{row[body.key]}</td>
-                  <td>{row[medianColumn]?.toFixed(1)}%</td>
-                  <td>{row[`change_pct_ensemble_min_${suffix}`]?.toFixed(1)}%</td>
-                  <td>{row[`change_pct_ensemble_max_${suffix}`]?.toFixed(1)}%</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <SortableTable
+            rows={agreeing}
+            rowKey={(row) => row[body.key]}
+            columns={[
+              ...regionColumns,
+              { label: "Median", sort: (row) => row[medianColumn],
+                render: (row) => `${row[medianColumn]?.toFixed(1)}%` },
+              { label: "Min", sort: (row) => row[`change_pct_ensemble_min_${suffix}`],
+                render: (row) => `${row[`change_pct_ensemble_min_${suffix}`]?.toFixed(1)}%` },
+              { label: "Max", sort: (row) => row[`change_pct_ensemble_max_${suffix}`],
+                render: (row) => `${row[`change_pct_ensemble_max_${suffix}`]?.toFixed(1)}%` },
+            ]}
+          />
         </>
       )}
 
@@ -243,29 +245,22 @@ export default function ContextPanel() {
             Measured at RP{builtRp} only, which is why the period travels with
             the figure.
           </p>
-          <table>
-            <thead>
-              <tr>
-                <th>{body.key}</th>
-                <th>Exposed, square metres</th>
-                <th>Total, square metres</th>
-                <th>Share</th>
-              </tr>
-            </thead>
-            <tbody>
-              {built.map((row) => (
-                <tr key={row[body.key]}>
-                  <td>{row[body.key]}</td>
-                  {/* Rounded here, not in the table: the figure is a sum of
-                      sub-cell fractions, so its decimals are real arithmetic
-                      and meaningless as a surface. */}
-                  <td>{squareMetres(row[`exposed_built_m2_rp${builtRp}`])}</td>
-                  <td>{squareMetres(row.built_total_m2)}</td>
-                  <td>{(row[builtColumn] * 100).toFixed(1)}%</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {/* Rounded at display, not in the table: the figure is a sum of
+              sub-cell fractions, so its decimals are real arithmetic and
+              meaningless as a surface. */}
+          <SortableTable
+            rows={built}
+            rowKey={(row) => row[body.key]}
+            columns={[
+              ...regionColumns,
+              { label: "Exposed, square metres", sort: (row) => row[`exposed_built_m2_rp${builtRp}`],
+                render: (row) => squareMetres(row[`exposed_built_m2_rp${builtRp}`]) },
+              { label: "Total, square metres", sort: (row) => row.built_total_m2,
+                render: (row) => squareMetres(row.built_total_m2) },
+              { label: "Share", sort: (row) => row[builtColumn],
+                render: (row) => `${(row[builtColumn] * 100).toFixed(1)}%` },
+            ]}
+          />
         </>
       )}
 
@@ -301,24 +296,17 @@ export default function ContextPanel() {
               share descending fills the table with regions a State covered
               entirely, which is the opposite of what this section is for: the
               question is where the modelled risk sits outside the designation. */}
-          <table>
-            <thead>
-              <tr>
-                <th>{body.key}</th>
-                <th>Declared share</th>
-                <th>Cycle</th>
-              </tr>
-            </thead>
-            <tbody>
-              {undeclared.slice(0, 15).map((row) => (
-                <tr key={row[body.key]}>
-                  <td>{row[body.key]}</td>
-                  <td>{(row.apsfr_share * 100).toFixed(1)}%</td>
-                  <td>{row.apsfr_cycle}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <SortableTable
+            rows={undeclared.slice(0, 15)}
+            rowKey={(row) => row[body.key]}
+            columns={[
+              ...regionColumns,
+              { label: "Declared share", sort: (row) => row.apsfr_share,
+                render: (row) => `${(row.apsfr_share * 100).toFixed(1)}%` },
+              { label: "Cycle", sort: (row) => row.apsfr_cycle,
+                render: (row) => row.apsfr_cycle },
+            ]}
+          />
         </>
       )}
 
@@ -331,26 +319,19 @@ export default function ContextPanel() {
             a reporting vintage like NUTS. Where this is high, a measure taken
             alone upstream is a measure taken on someone else&apos;s territory.
           </p>
-          <table>
-            <thead>
-              <tr>
-                <th>{body.key}</th>
-                <th>Shared share</th>
-                <th>Countries</th>
-                <th>Shared with</th>
-              </tr>
-            </thead>
-            <tbody>
-              {shared.map((row) => (
-                <tr key={row[body.key]}>
-                  <td>{row[body.key]}</td>
-                  <td>{(row.shared_basin_share * 100).toFixed(0)}%</td>
-                  <td>{row.basin_countries_max}</td>
-                  <td>{countries(row.shared_with)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <SortableTable
+            rows={shared}
+            rowKey={(row) => row[body.key]}
+            columns={[
+              ...regionColumns,
+              { label: "Shared share", sort: (row) => row.shared_basin_share,
+                render: (row) => `${(row.shared_basin_share * 100).toFixed(0)}%` },
+              { label: "Countries", sort: (row) => row.basin_countries_max,
+                render: (row) => row.basin_countries_max },
+              { label: "Shared with", sort: (row) => countries(row.shared_with),
+                render: (row) => countries(row.shared_with) },
+            ]}
+          />
         </>
       )}
     </section>

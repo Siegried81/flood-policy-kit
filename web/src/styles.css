@@ -180,3 +180,12 @@ details summary { cursor: pointer; color: var(--muted); font-size: 0.85rem; marg
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* Every table header sorts (components/SortableTable.jsx). */
+th.sortable-header {
+  cursor: pointer;
+  user-select: none;
+}
+th.sortable-header:hover {
+  text-decoration: underline;
+}
