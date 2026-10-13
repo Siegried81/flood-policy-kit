@@ -465,11 +465,51 @@ def test_no_region_identifier_is_a_500_that_names_the_problem(frozen):
 
 
 def test_approve_is_the_only_route_that_writes(tmp_path, monkeypatch, client):
+    monkeypatch.delenv("FLOOD_APPROVE_TOKEN", raising=False)
     monkeypatch.setattr(api, "APPROVED", tmp_path / "approved.md")
     body = client.post("/api/approve", json={"text": "Approved text, unchanged."}).json()
     written = (tmp_path / "approved.md").read_text(encoding="utf-8")
     assert "Approved text, unchanged." in written
     assert body["approved_at"]
+
+
+def test_approve_without_a_token_accepts_the_docker_port_forward(tmp_path, monkeypatch, frozen):
+    """No token configured: a caller behind Docker's port-forward may approve.
+
+    The React UI on the host reaches the API container through the published
+    port, so the container sees the bridge gateway, never loopback. Refusing
+    non-loopback callers turned the Approve button into a 403 under Docker.
+    """
+    monkeypatch.delenv("FLOOD_APPROVE_TOKEN", raising=False)
+    monkeypatch.setattr(api, "APPROVED", tmp_path / "approved.md")
+    gateway = TestClient(app, client=("172.17.0.1", 50000))
+    assert gateway.post("/api/approve", json={"text": "x"}).status_code == 200
+    assert (tmp_path / "approved.md").exists()
+
+
+def test_approve_requires_the_configured_token(tmp_path, monkeypatch, client):
+    """With a token set, even a local caller must present it."""
+    monkeypatch.setenv("FLOOD_APPROVE_TOKEN", "s3cret-test-value")
+    monkeypatch.setattr(api, "APPROVED", tmp_path / "approved.md")
+    assert client.post("/api/approve", json={"text": "x"}).status_code == 403
+    wrong = {"X-Approve-Token": "nope"}
+    assert client.post("/api/approve", json={"text": "x"}, headers=wrong).status_code == 403
+    assert not (tmp_path / "approved.md").exists()
+    remote = TestClient(app, client=("203.0.113.7", 50000))
+    good = {"X-Approve-Token": "s3cret-test-value"}
+    assert remote.post("/api/approve", json={"text": "x"}, headers=good).status_code == 200
+
+
+def test_approve_caps_the_text_length(tmp_path, monkeypatch, client):
+    monkeypatch.setattr(api, "APPROVED", tmp_path / "approved.md")
+    too_long = "a" * (api.MAX_APPROVED_CHARS + 1)
+    assert client.post("/api/approve", json={"text": too_long}).status_code == 422
+
+
+@pytest.mark.parametrize("k", [0, -1, api.rag.MAX_PASSAGES + 1])
+def test_search_bounds_k(monkeypatch, client, k):
+    monkeypatch.setattr(api.rag, "search", lambda q, k=5: [])
+    assert client.get("/api/search", params={"q": "flood", "k": k}).status_code == 422
 
 
 def test_geojson_is_served_verbatim(tmp_path, monkeypatch, client):
