@@ -47,6 +47,7 @@ from src.vulnerability import sensitivity  # noqa: E402
 # It costs this app an import of fastapi, which is pure Python and already a hard
 # requirement of the kit - unlike tiktoken, see the note in src/toon_io.py.
 from api.main import climate_periods, vulnerability_indicators  # noqa: E402
+from api.main import MODEL_SPREAD_PP, with_size_uncertain  # noqa: E402
 
 st.set_page_config(page_title="Flood exposure, Europe", layout="wide")
 
@@ -575,13 +576,26 @@ with context_tab:
                     "agreement count becomes readable."
                 )
             elif agrees_column in context.columns and median_column in context.columns:
-                agreeing = context[context[agrees_column].fillna(False)]
+                flagged = with_size_uncertain(context)
+                uncertain_column = f"ensemble_size_uncertain_{suffix}"
+                agreeing = flagged[flagged[agrees_column].fillna(False)]
+                uncertain = agreeing[agreeing[uncertain_column].fillna(False)]
+                agreeing = agreeing[~agreeing[uncertain_column].fillna(False)]
                 st.markdown(
                     f"**Largest increases among the {len(agreeing):,} regions where "
-                    f"every chain agrees on the direction.** The regions left out "
-                    "are not regions with no change: they are regions where the "
-                    "chains point different ways, which is a finding of its own."
+                    f"every chain agrees on the direction and on the size.** The "
+                    "regions left out are not regions with no change: they are "
+                    "regions where the chains point different ways, which is a "
+                    "finding of its own."
                 )
+                if len(uncertain):
+                    st.caption(
+                        f"{len(uncertain):,} more regions agree on the direction but "
+                        f"not on the size: their chains lie more than "
+                        f"{MODEL_SPREAD_PP:.0f} points apart, so the median is the "
+                        "average of two different stories and is not ranked. "
+                        f"Largest of them: {', '.join(uncertain.nlargest(3, median_column)['nuts_id'])}."
+                    )
                 columns = [c for c in (
                     "nuts_id",
                     median_column,

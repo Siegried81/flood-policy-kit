@@ -66,10 +66,18 @@ export default function ContextPanel() {
   const suffix = period ? period.replace("-", "_") : null;
   const medianColumn = `change_pct_ensemble_median_${suffix}`;
   const agreesColumn = `ensemble_agrees_on_sign_${suffix}`;
+  // Set by the API: the chains agree on the direction but lie more than
+  // MODEL_SPREAD_PP points apart, so the median is not a size to rank by.
+  const uncertainColumn = `ensemble_size_uncertain_${suffix}`;
   const rows = body.rows ?? [];
 
   const agreeing = rows
-    .filter((row) => row[agreesColumn] === true && row[medianColumn] != null)
+    .filter(
+      (row) =>
+        row[agreesColumn] === true &&
+        row[uncertainColumn] !== true &&
+        row[medianColumn] != null
+    )
     .sort((a, b) => b[medianColumn] - a[medianColumn])
     .slice(0, 15);
 
@@ -194,6 +202,15 @@ export default function ContextPanel() {
             out are not regions with no change: they are regions where the chains
             point different ways, which is a finding of its own.
           </p>
+          {summary.regions_size_uncertain > 0 && (
+            <p>
+              Not ranked:{" "}
+              <strong>{summary.regions_size_uncertain.toLocaleString()}</strong>{" "}
+              regions whose chains lie more than {summary.model_spread_pp} points
+              apart. Their median
+              is the average of two different stories, not a size to quote.
+            </p>
+          )}
           <table>
             <thead>
               <tr>

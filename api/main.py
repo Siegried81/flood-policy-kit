@@ -273,6 +273,37 @@ def _context() -> pd.DataFrame:
     return pd.read_parquet(CONTEXT)
 
 
+#: Percentage points between the lowest and the highest model chain above which
+#: a region's median is a size nobody can quote. Measured on context.parquet
+#: 2026-10-13, 2071-2100: the two top regions of Europe, DE94H (+253%) and DK014
+#: (+210%), rest on chains 322 and 240 points apart, one of them reading +92% and
+#: the other +414%. The median of two chains is their mean, so it hides that.
+MODEL_SPREAD_PP = 100.0
+
+
+def with_size_uncertain(df: pd.DataFrame) -> pd.DataFrame:
+    """Add `ensemble_size_uncertain_<period>` for every period the table carries.
+
+    True where the chains agree or not on the direction but their regional
+    medians lie more than `MODEL_SPREAD_PP` points apart: the median is then the
+    average of two different stories, and ranking regions by it puts model
+    disagreement at the top of the list. A region with no measurement is False,
+    not True: there is nothing to be uncertain about.
+    """
+    out = df.copy()
+    prefix = "ensemble_members_"
+    for column in df.columns:
+        if not column.startswith(prefix):
+            continue
+        suffix = column[len(prefix):]
+        low = df.get(f"change_pct_ensemble_min_{suffix}")
+        high = df.get(f"change_pct_ensemble_max_{suffix}")
+        if low is None or high is None:
+            continue
+        out[f"ensemble_size_uncertain_{suffix}"] = (high - low) > MODEL_SPREAD_PP
+    return out
+
+
 def climate_periods(df: pd.DataFrame) -> list[dict]:
     """One summary per CDS period present, with what licenses a sentence about it.
 
@@ -299,8 +330,12 @@ def climate_periods(df: pd.DataFrame) -> list[dict]:
       agreement with itself - so `single_member` says WHY it is zero. Without it
       a one-member period reads as a period where the models disagree, which is
       a different and wrong claim.
+    - `regions_size_uncertain` counts the regions whose chains lie more than
+      `model_spread_pp` points apart (see `with_size_uncertain`): agreeing on the
+      direction, not on how much. Both UIs leave them out of the ranking.
     """
     periods: list[dict] = []
+    flagged = with_size_uncertain(df)
     prefix = "ensemble_members_"
     for column in df.columns:
         if not column.startswith(prefix):
@@ -319,6 +354,10 @@ def climate_periods(df: pd.DataFrame) -> list[dict]:
                 float(median[measured].median()) if bool(measured.any()) else None
             ),
             "regions_agreeing_on_sign": int(agrees.sum()) if agrees is not None else 0,
+            "regions_size_uncertain": int(
+                flagged.get(f"ensemble_size_uncertain_{suffix}", pd.Series([], dtype=bool)).sum()
+            ),
+            "model_spread_pp": MODEL_SPREAD_PP,
         })
     return sorted(periods, key=lambda entry: entry["period"])
 
@@ -335,7 +374,7 @@ def context() -> dict:
     reader will over-read, so `climate_periods` travels with every response
     instead of being something a caller has to think to ask for.
     """
-    df = _context()
+    df = with_size_uncertain(_context())
     key = _region_key(df)
     records = json.loads(df.to_json(orient="records"))  # NaN -> null, which JSON can carry
     # The built-up figures are measured at ONE return period, which the column

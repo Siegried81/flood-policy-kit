@@ -1847,3 +1847,43 @@ in its climate table and does not yet show density, income or Natura.
     Copy-Item data\processed\context.data-layers-12-10.parquet data\processed\context.parquet
 
 Tests (WSL, Python 3.14, no `data/`): **650 on `main`, 685 after the merge**.
+
+## 2026-10-13 — two chains far apart are not ranked on their median
+
+**MEASUREMENT CHANGE — the "largest increases" ranking in both UIs.** Asked why
+DE94H (Wittmund) showed **+253.2%** and DK014 (Bornholm) **+210.0%** for the
+50-year discharge, 2071-2100, the top two of 1,198 regions where the median
+region is +20.3%.
+
+**What the cells say.** Read point-in-polygon on the four NetCDFs on disk, the
+two "members" are two HYDROLOGICAL models (E-HYPEgrid, VIC-WUR) forced by the
+same climate run (EC-EARTH / CCLM4-8-17), so no climate uncertainty is sampled
+at all. In Wittmund (28 cells) E-HYPE gives a median of +92% and VIC-WUR
++414%, with all 28 VIC cells between +53% and +701%; in Bornholm (26 cells)
+E-HYPE gives +330% and VIC-WUR +90%. The ensemble median of two chains is their
+mean, +253% and +210%. It is a shift of the whole region in one model, not a
+tail of near-zero-reference cells, and it is not stable across periods either:
+Greiz (DEG0L) reads +238% in 2041-2070 and +49% in 2071-2100 under E-HYPE. A
+50-year return value fitted on a 30-year window is an extrapolation, and small
+catchments carry the sampling noise. Whether a near-zero 1971-2000 discharge
+also plays a part is NOT established: the files on disk carry the relative
+change only, and testing it needs the absolute reference values from the CDS.
+
+**What changed.** `api/main.py::with_size_uncertain` adds
+`ensemble_size_uncertain_<period>`: True where the chains' regional medians lie
+more than `MODEL_SPREAD_PP` = 100 points apart. `climate_periods` reports
+`regions_size_uncertain` and the threshold; `/api/context` serves the flag on
+every row. Both UIs rank the largest increases among regions that agree on the
+direction AND on the size, and say how many were left out and why. Nothing in
+`context.parquet` changes: the flag is computed from its min and max columns.
+
+**What it does to the numbers.** Regions left out of the ranking: 3 of 976
+agreeing in 2011-2040, 13 of 994 in 2041-2070, 47 of 943 in 2071-2100. The
+2071-2100 top five moves from DE94H, DK014, DE934, DE24D, BE233 to BE233
+(+183.8%, chains +167% and +201%), CZ051, DE94A, ITC31, FR104. The medians
+themselves are unchanged.
+
+**What would reverse it.** More chains. With the eight simulations
+`scripts/fetch_cds_member.py` knows, the interquartile range of the members'
+medians is the interval to quote and a two-chain spread stops being the only
+evidence; the threshold should then be revisited, not kept by habit.
