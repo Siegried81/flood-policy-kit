@@ -53,7 +53,7 @@ from src.toon_io import flatten, to_toon  # noqa: E402
 # more regions should narrow by country, not page through the whole continent.
 MAX_RANKED = 50
 MAX_PROFILED = 10
-MAX_PASSAGES = 5
+MAX_PASSAGES = rag.MAX_PASSAGES  # one cap, shared with the JSON API
 # A passage is trimmed, not dropped: the citation (source + ordinal) is what the
 # agent must quote, and 600 characters is enough to judge relevance.
 PASSAGE_CHARS = 600
