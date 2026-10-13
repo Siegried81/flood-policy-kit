@@ -693,6 +693,30 @@ def test_a_single_member_period_says_why_nothing_agrees(client, frozen_context):
     assert near["median_change_pct"] == pytest.approx(20.0)
 
 
+def test_chains_far_apart_mark_the_size_as_uncertain(client, frozen_context):
+    """Two chains reading +92% and +414% average to +253%, the top of Europe.
+
+    Measured on context.parquet 2026-10-13 for DE94H, 2071-2100. Both chains
+    agree on the direction, so the old ranking put the region first, on a median
+    that is the mean of two different stories. More than MODEL_SPREAD_PP points
+    apart, the region is flagged, counted, and both UIs leave it out of the
+    ranking. A region measured nowhere is not uncertain: there is nothing to be
+    uncertain about.
+    """
+    table = _context_table()
+    table["change_pct_ensemble_median_2041_2070"] = [253.2, 20.0, None]
+    table["change_pct_ensemble_min_2041_2070"] = [92.1, 15.0, None]
+    table["change_pct_ensemble_max_2041_2070"] = [414.3, 25.0, None]
+    frozen_context(table)
+    body = TestClient(app).get("/api/context").json()
+
+    flags = [row["ensemble_size_uncertain_2041_2070"] for row in body["rows"]]
+    assert flags == [True, False, False]
+    near = {p["period"]: p for p in body["climate_periods"]}["2041-2070"]
+    assert near["regions_size_uncertain"] == 1
+    assert near["model_spread_pp"] == api.MODEL_SPREAD_PP
+
+
 def test_the_periods_are_read_off_the_column_names(client, frozen_context):
     """`scripts/build_context.py` suffixes its climate columns with the period, so
     a period added to the build has to surface here without this file changing."""
