@@ -96,6 +96,10 @@ flood-policy-kit/
 │   ├── apsfr.py                # what the Member State declared at risk, vs what the model shows
 │   ├── demographics.py         # Eurostat indicators at NUTS3: the axes the index weighs
 │   ├── toon_io.py              # compact table encoding for LLM prompts
+│   ├── legislation.py          # config/legislation.yaml -> citations with article and EUR-Lex URL
+│   ├── svgmap.py               # offline choropleth as inline SVG (no tile server)
+│   ├── translate.py            # translate an approved brief section, and check its figures survived
+│   ├── usage_log.py            # read/write docs/ai_usage_log.md, Annex A of the brief
 │   ├── fetch.py                # parallel, polite, idempotent collection
 │   ├── workflow.py             # LangGraph brief pipeline with an approval gate
 │   ├── rag.py                  # grounded "cite or refuse" over the policy corpus
@@ -105,6 +109,7 @@ flood-policy-kit/
 │   ├── build_context.py             # freezes data/processed/context.parquet, what qualifies an exposure figure
 │   ├── fetch_cds_member.py          # CDS ensemble members, each verified against what was asked
 │   ├── build_geometry.py            # freezes data/processed/regions.geojson, the choropleth's polygons
+│   ├── docs_numbers.py              # measures the figures the docs quote and rewrites every marked copy
 │   └── check_offline_readiness.py   # is this laptop demo-ready with the Wi-Fi off?
 ├── api/main.py                 # JSON API over src/, for the React UI
 ├── api/mcp_server.py           # 3 intent-based MCP tools for agents, answered in flat TOON
