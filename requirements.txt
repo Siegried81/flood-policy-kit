@@ -28,9 +28,9 @@ shapely>=2.1.2
 # WHOLE suite runs in WSL2, <!-- numbers:tests_collected -->702<!-- /numbers --> passed
 # and nothing deselected (the count is written by scripts/docs_numbers.py).
 #
-# Keep the WSL2 venv (`~/.venvs/flood` on Ubuntu) anyway: it is the only route
-# that does not depend on the policy's mood, it is where a continental raster
-# build belongs, and the three raster test modules are exactly what disappears
+# Keep the WSL2 venv (`~/venvs/flood-test` on Ubuntu) anyway: it is the only
+# route that does not depend on the policy's mood, it is where a continental
+# raster build belongs, and the five raster test modules are exactly what disappears
 # when the policy flips. The pins below still matter for the Windows venv.
 #
 # pyproj is pinned EXPLICITLY although geopandas pulls it in transitively,

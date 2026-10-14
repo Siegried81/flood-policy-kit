@@ -1887,3 +1887,16 @@ themselves are unchanged.
 `scripts/fetch_cds_member.py` knows, the interquartile range of the members'
 medians is the interval to quote and a two-chain spread stops being the only
 evidence; the threshold should then be revisited, not kept by habit.
+
+## 2026-10-14 — `fetch_cds_member.py` resolves its output directory at call time
+
+- **What:** `on_disk`, `missing` and `fetch` took `out_dir: Path = OUT_DIR`, a
+  default bound once at import. They now take `None` and read `OUT_DIR` when
+  called.
+- **Why:** the dry-run test patches `OUT_DIR` to a temporary directory, but the
+  bound default ignored the patch and read the real `data/`, so on a machine
+  holding CDS files the test counted 42 missing members instead of 48 and
+  failed, while passing on CI. Measured: that test fails before the change and
+  passes after; the WSL2 suite goes from 701 passed / 1 failed to 702 passed.
+- **What changes in the numbers:** nothing the analysis reports. Only the
+  script's directory lookup moves, and its default path is unchanged.

@@ -311,9 +311,9 @@ this page adds is the current legislative context a JRC jury will know:
   did not change; a table or export from an older build says `poverty_rate`,
   and the API and both UIs read it under the new name for one release.
 - Measured 2026-10-12: the full suite is **<!-- numbers:tests_collected -->702<!-- /numbers --> tests, all passing
-  in WSL2 with nothing deselected**; re-run on 2026-10-14, 701 pass and one
-  climate dry-run test fails on a machine whose `data/` already holds CDS
-  files (it passes without them). Smart App Control blocked `rasterio` on
+  in WSL2 with nothing deselected**; re-run on 2026-10-14, all
+  702 pass again once the climate dry-run test stopped reading the CDS files
+  already in `data/`. Smart App Control blocked `rasterio` on
   Windows on 2026-10-07, allowed it the next morning with nothing reinstalled,
   and blocked it again on 2026-10-12, so the policy moves both ways and the only safe habit is to
   re-measure rather than quote this line. The WSL2 venv stays as the route that
