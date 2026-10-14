@@ -346,7 +346,10 @@ down in advance.
 
 **<!-- numbers:tests_collected -->702<!-- /numbers --> tests, offline**: no network, no model, no key. Measured 12 October 2026 in
 WSL2: all <!-- numbers:tests_collected -->702<!-- /numbers --> collect and pass, nothing deselected; the same day Windows
-blocked `rasterio` again. Do not quote either as a property of the platform — Smart App Control moved to enforcement on 7 October
+blocked `rasterio` again. Re-run on 14 October 2026: still blocked on Windows
+(the five raster modules, 59 tests, do not collect), and in WSL2 701 pass and
+one fails — `test_climate.py`'s dry-run test, which reads the CDS files already
+in `data/` and so fails only on a machine that has them. Do not quote either as a property of the platform — Smart App Control moved to enforcement on 7 October
 2026 and refused rasterio's unsigned DLLs, which left 433 collectable and 431
 passing on Windows while WSL2 ran the lot; by the next morning it allowed the
 same wheel again with nothing reinstalled. **The policy moves both ways, so
@@ -361,7 +364,7 @@ block that `scripts/docs_numbers.py --write` fills from `pytest --collect-only`,
 and `tests/test_docs_numbers.py` fails the suite when any marked block in the
 docs disagrees with the repository. Edit the prose, never the digit.
 
-Per-file counts measured 12 October 2026 with
+Per-file counts measured 14 October 2026 with
 `pytest --collect-only -q | grep '::' | cut -d: -f1 | sort | uniq -c`; they sum to the
 marked total above. Twenty-nine files — an earlier table listed twenty-two and
 summed to 473, a figure that had survived three suite changes by being typed.
@@ -371,10 +374,10 @@ summed to 473, a figure that had survived three suite changes by being typed.
 | `test_nlquery.py` | 51 | natural-language questions over the table: the spec whitelist, unknown columns and operators refused, one period, nulls counted as not measured, one model call and no retry |
 | `test_offline_readiness.py` | 52 | the demo runs with the Wi-Fi off: the three verdicts, `--strict`, a rejected file is not present, the two caches `src.fetch` does not fill |
 | `test_validate.py` | 50 | the scoring grid, the three metrics, `None` vs `0.0` |
-| `test_api.py` | 56 | the routes, the 404s that name their builder, the JSX guards, a table frozen before the units rename |
+| `test_api.py` | 63 | the routes, the 404s that name their builder, the JSX guards, a table frozen before the units rename, the approve token and the bounds on `k` |
 | `test_streamlit_app.py` | 55 | the fallback UI, the translation and ask-the-table tabs, the climate and coverage caveats, the density, income and Natura 2000 sections, a rebuilt table replacing the cached one, a table frozen before the units rename |
 | `test_fetch.py` | 59 | robots, idempotency, multi-file expansion, a stale rejection page is quarantined, colliding paths are refused, the cited policy sources are declared and every corpus file lands in a format the index reads |
-| `test_rag.py` | 35 | cite-or-refuse |
+| `test_rag.py` | 41 | cite-or-refuse, and a fence no spelling of the closing tag escapes |
 | `test_losses.py` | 29 | the RDH euro vintages and the levelling |
 | `test_basins.py` | 27 | the shared-basin layer: the declared crosswalk, the sliver floor |
 | `test_exposure.py` | 23 | the two modes, `nodata_means_dry`, the masks, the build checkpoint |

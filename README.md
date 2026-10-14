@@ -132,16 +132,18 @@ Windows host. The `pyogrio`/`pyproj` caps in `requirements.txt` bought back thre
 of them. Windows Smart App Control then moved to enforcement on 2026-10-07 and
 refused `rasterio`'s own GDAL build, which no pin fixed; by 2026-10-08 it allowed
 the same wheel again with nothing reinstalled. **The policy moves both ways, so
-measure rather than believe either state** — measured 2026-10-12, it blocks
-`import rasterio` again, so the three raster test modules do not collect on
-Windows, while the WSL2 venv runs the whole suite: **<!-- numbers:tests_collected -->702<!-- /numbers --> passed, nothing
-deselected**. The WSL2 venv stays, because it is the only route that does
+measure rather than believe either state** — measured 2026-10-14, it blocks
+`import rasterio` again, so the five raster test modules (59 tests) do not
+collect on Windows, while the WSL2 venv collects the whole suite:
+**<!-- numbers:tests_collected -->702<!-- /numbers --> collected, nothing deselected; 701 passed and 1 failed** — a
+climate dry-run test that reads the CDS files already in `data/`, so it fails
+on a machine that has them and passes on CI, which has none. The WSL2 venv stays, because it is the only route that does
 not depend on the policy's mood and it is where a continental raster build
 belongs. **The `app` image was built and run on 2026-10-12:** `rasterio`,
 `pyogrio`, `rasterstats` and `tiktoken` all import inside it. Run there without
 `data/` or `.env`, the suite gave 562 passed and 7 failed, every failure a
-provider test reading the `OLLAMA_URL` that Compose sets (fixed on
-`fix/hermetic-llm-tests-12-10`). Through `docker compose run test` it gave 558
+provider test reading the `OLLAMA_URL` that Compose sets (fixed since, merged
+in PR #6). Through `docker compose run test` it gave 558
 passed and 11 failed: the same 7, and 4 not yet diagnosed. An image built on
 2026-10-09 could not import `rasterio` (`libexpat.so.1` missing) while a fresh
 build of the same Dockerfile can, so rebuild rather than trust an old local
@@ -195,14 +197,15 @@ never published; build it locally.
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m pytest -q           # <!-- numbers:tests_collected -->702<!-- /numbers --> tests, offline: no network, no model
-                                        # Measured 2026-10-12 in WSL2, nothing
-                                        # deselected. Smart App Control blocks
+                                        # Collected 2026-10-14 in WSL2, nothing
+                                        # deselected (701 passed, 1 data-dependent
+                                        # failure). Smart App Control blocks
                                         # rasterio on Windows some days and not
-                                        # others (blocked again 2026-10-12), so re-measure
+                                        # others (blocked again 2026-10-14), so re-measure
                                         # rather than trust this number — see
                                         # requirements.txt for the whole story.
                                         #   wsl -d Ubuntu
-                                        #   ~/.venvs/flood/bin/python -m pytest -q
+                                        #   ~/venvs/flood-test/bin/python -m pytest -q
 .venv/bin/python -m src.fetch           # 38 geodata downloads + 24 policy_corpus
                                         # + 3 context = 65 files, ≈5.09 GiB
                                         # (before 25 Oct, once)

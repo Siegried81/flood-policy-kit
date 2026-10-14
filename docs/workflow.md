@@ -18,8 +18,9 @@ So `src/workflow.py` is a fixed graph:
 
 ```
 retrieve ──► draft ──► verify ──┬──► approve ──► END
-               ▲                │
-               └────────────────┘   (bounded redraft)
+   │           ▲                │       ▲
+   │           └────────────────┘       │   (bounded redraft)
+   └──► refuse ─────────────────────────┘   (nothing retrieved: the human still sees it)
 ```
 
 One LLM call per node. No tool loop. The graph cannot take an action nobody
