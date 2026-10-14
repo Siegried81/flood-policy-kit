@@ -347,9 +347,9 @@ down in advance.
 **<!-- numbers:tests_collected -->702<!-- /numbers --> tests, offline**: no network, no model, no key. Measured 12 October 2026 in
 WSL2: all <!-- numbers:tests_collected -->702<!-- /numbers --> collect and pass, nothing deselected; the same day Windows
 blocked `rasterio` again. Re-run on 14 October 2026: still blocked on Windows
-(the five raster modules, 59 tests, do not collect), and in WSL2 701 pass and
-one fails — `test_climate.py`'s dry-run test, which reads the CDS files already
-in `data/` and so fails only on a machine that has them. Do not quote either as a property of the platform — Smart App Control moved to enforcement on 7 October
+(the five raster modules, 59 tests, do not collect), and in WSL2 all 702 pass
+once `test_climate.py`'s dry-run test stopped reading the CDS files already in
+`data/` (`fetch_cds_member.py` now resolves `OUT_DIR` at call time). Do not quote either as a property of the platform — Smart App Control moved to enforcement on 7 October
 2026 and refused rasterio's unsigned DLLs, which left 433 collectable and 431
 passing on Windows while WSL2 ran the lot; by the next morning it allowed the
 same wheel again with nothing reinstalled. **The policy moves both ways, so

@@ -159,13 +159,18 @@ def check(path: Path, model: str, period: str, simulation=DEFAULT_SIMULATION) ->
     return fields
 
 
-def on_disk(model: str, period: str, simulation, out_dir: Path = OUT_DIR) -> list[str]:
+def on_disk(model: str, period: str, simulation, out_dir: Path | None = None) -> list[str]:
     """The files already present for exactly this member, by every field.
+
+    `out_dir` defaults to OUT_DIR read at call time, not at import: a default
+    bound in the signature would ignore a patched or reconfigured OUT_DIR and
+    read the real data directory.
 
     Matching on the hydrological model and the period alone - which was enough
     while one simulation existed - would report HadGEM2 through E-HYPEgrid as
     "already on disk" because EC-EARTH through E-HYPEgrid is.
     """
+    out_dir = OUT_DIR if out_dir is None else out_dir
     if not out_dir.exists():
         return []
     found = []
@@ -181,8 +186,9 @@ def on_disk(model: str, period: str, simulation, out_dir: Path = OUT_DIR) -> lis
     return found
 
 
-def missing(out_dir: Path = OUT_DIR) -> list[tuple[str, str, tuple]]:
+def missing(out_dir: Path | None = None) -> list[tuple[str, str, tuple]]:
     """Every (model, period, simulation) without both of its variables on disk."""
+    out_dir = OUT_DIR if out_dir is None else out_dir
     plan = []
     for simulation in SIMULATIONS:
         for model in MODELS:
@@ -202,13 +208,14 @@ def credentials_present() -> str | None:
     return None
 
 
-def fetch(client, model: str, period: str, simulation, out_dir: Path = OUT_DIR) -> list[str]:
+def fetch(client, model: str, period: str, simulation, out_dir: Path | None = None) -> list[str]:
     """Retrieve one member, verify every file, then move them into `out_dir`.
 
     Extracted to a staging directory first: a wrong member must never land in
     the directory `scripts/build_context.py` globs for ensemble files, because
     nothing downstream would question it.
     """
+    out_dir = OUT_DIR if out_dir is None else out_dir
     gcm, rcm, member = simulation
     tag = f"{model}_{period}_{gcm}_{rcm}_{member}"
     out_dir.mkdir(parents=True, exist_ok=True)
