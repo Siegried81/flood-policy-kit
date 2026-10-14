@@ -54,7 +54,8 @@ the centre instead of in an apology at the end.
 ## 3. The measured base, 2026-10-08
 
 `exposure.parquet`: **12,105 rows** = **<!-- numbers:nuts3_regions -->1,345<!-- /numbers -->** NUTS3 regions x **9** return
-periods, 15 columns, 37 country codes. `context.parquet`: 1,345 rows, 29 columns.
+periods, 15 columns, 37 country codes. `context.parquet`: 1,345 rows, 46 columns (29 on 2026-10-08; the
+density, income and Natura 2000 layers came later).
 
 | Figure, 1-in-100-year river flood | Value |
 |---|---|
@@ -310,7 +311,9 @@ this page adds is the current legislative context a JRC jury will know:
   did not change; a table or export from an older build says `poverty_rate`,
   and the API and both UIs read it under the new name for one release.
 - Measured 2026-10-12: the full suite is **<!-- numbers:tests_collected -->702<!-- /numbers --> tests, all passing
-  in WSL2 with nothing deselected**. Smart App Control blocked `rasterio` on
+  in WSL2 with nothing deselected**; re-run on 2026-10-14, 701 pass and one
+  climate dry-run test fails on a machine whose `data/` already holds CDS
+  files (it passes without them). Smart App Control blocked `rasterio` on
   Windows on 2026-10-07, allowed it the next morning with nothing reinstalled,
   and blocked it again on 2026-10-12, so the policy moves both ways and the only safe habit is to
   re-measure rather than quote this line. The WSL2 venv stays as the route that
