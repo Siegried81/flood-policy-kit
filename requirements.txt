@@ -5,7 +5,7 @@
 geopandas>=1.2.0
 rasterio>=1.5.2
 rasterstats>=0.21.0
-shapely>=2.1.2
+shapely>=2.2.0
 # PINNED, and the cap is load-bearing - do not "fix" it by unpinning, and note
 # that dependabot has already tried twice: once with a bump that deleted this
 # cap, this comment and the pyproj line below, and once on 2026-10-07 that kept
@@ -48,7 +48,7 @@ cdsapi>=0.7.7         # ONLY scripts/fetch_cds_member.py, a pre-event errand;
 
 # Analysis
 pandas>=3.0.6
-numpy>=2.5.3
+numpy>=2.5.4
 
 # App + maps
 streamlit>=1.65.0
@@ -66,14 +66,14 @@ python-dotenv>=1.2.4    # reads .env, so an unset key means "unavailable" and no
 pytest>=9.1.1
 
 # API for the React UI
-fastapi>=0.142.2
+fastapi>=0.143.0
 uvicorn>=0.54.0
-pypdf>=6.19.0          # the policy corpus includes PDFs
-pyarrow>=25.0.1       # parquet round-trips dtypes exactly; CSV loses a NUTS code's leading zero
+pypdf>=6.20.0          # the policy corpus includes PDFs
+pyarrow>=26.0.0       # parquet round-trips dtypes exactly; CSV loses a NUTS code's leading zero
 
 # Workflow + optional tracing
-langgraph>=1.2.12
-langchain-core>=1.6.6
+langgraph>=1.2.14
+langchain-core>=1.6.9
 
 # Agent access: intent-based MCP tools (api/mcp_server.py). Pure Python.
-mcp>=2.2.0
+mcp>=2.3.0
