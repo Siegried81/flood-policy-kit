@@ -310,7 +310,7 @@ this page adds is the current legislative context a JRC jury will know:
   `poverty_rate_pct` is a percentage beside `share_over_65`, a fraction. Values
   did not change; a table or export from an older build says `poverty_rate`,
   and the API and both UIs read it under the new name for one release.
-- Measured 2026-10-12: the full suite is **<!-- numbers:tests_collected -->702<!-- /numbers --> tests, all passing
+- Measured 2026-10-12: the full suite is **<!-- numbers:tests_collected -->703<!-- /numbers --> tests, all passing
   in WSL2 with nothing deselected**; re-run on 2026-10-14, all
   702 pass again once the climate dry-run test stopped reading the CDS files
   already in `data/`. Smart App Control blocked `rasterio` on

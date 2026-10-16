@@ -344,8 +344,8 @@ down in advance.
 
 ## 7. The test suite
 
-**<!-- numbers:tests_collected -->702<!-- /numbers --> tests, offline**: no network, no model, no key. Measured 12 October 2026 in
-WSL2: all <!-- numbers:tests_collected -->702<!-- /numbers --> collect and pass, nothing deselected; the same day Windows
+**<!-- numbers:tests_collected -->703<!-- /numbers --> tests, offline**: no network, no model, no key. Measured 12 October 2026 in
+WSL2: all <!-- numbers:tests_collected -->703<!-- /numbers --> collect and pass, nothing deselected; the same day Windows
 blocked `rasterio` again. Re-run on 14 October 2026: still blocked on Windows
 (the five raster modules, 59 tests, do not collect), and in WSL2 all 702 pass
 once `test_climate.py`'s dry-run test stopped reading the CDS files already in
@@ -413,7 +413,7 @@ zonal statistic is the right arithmetic on the wrong piece of Europe. Measured o
 
 | Claim | Source |
 |---|---|
-| <!-- numbers:tests_collected -->702<!-- /numbers --> tests | `scripts/docs_numbers.py --write`, which runs `pytest --collect-only` and rewrites the marked blocks; the per-file counts are typed by hand |
+| <!-- numbers:tests_collected -->703<!-- /numbers --> tests | `scripts/docs_numbers.py --write`, which runs `pytest --collect-only` and rewrites the marked blocks; the per-file counts are typed by hand |
 | 65 files, ≈5.09 GiB | `src.fetch.expand()` over `config/sources.yaml`; the bytes are the 6 October `Content-Length` plus the Natura 2000 GeoPackage measured on 12 October, a floor since twelve documents were added on 12 October |
 | <!-- numbers:sources_declared -->57<!-- /numbers --> declared inputs, <!-- numbers:sources_verified -->49<!-- /numbers --> with a verification date, <!-- numbers:sources_licensed -->20<!-- /numbers --> with an explicit `licence:` | `scripts/docs_numbers.py` over `config/sources.yaml`: entries with an `id`; `verified` not null; `licence` non-empty |
 | 1,345 NUTS3 polygons | the GISCO NUTS 2024 file itself |

@@ -163,9 +163,11 @@ class _HostThrottle:
             # Reserve this host's slot *before* releasing the lock, so the next
             # thread queues behind us instead of racing for the same instant.
             self._next_allowed[host] = max(now, earliest) + delay
-            sleep_for = max(0.0, earliest - now)
-        if sleep_for:
-            time.sleep(sleep_for)
+        # A loop, not one sleep: on Windows `time.sleep` can return a few ms
+        # before `time.monotonic` (15.6 ms ticks) reaches `earliest`, which would
+        # shave a published Crawl-delay. Re-check on the clock the slot is on.
+        while (remaining := earliest - time.monotonic()) > 0:
+            time.sleep(remaining)
 
 
 class _HostTransfers:

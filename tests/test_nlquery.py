@@ -199,6 +199,18 @@ def test_a_fence_or_prose_around_the_object_is_tolerated(text):
     assert nlquery.parse(text)["columns"] == ["region"]
 
 
+def test_a_long_run_of_spaces_is_refused_in_linear_time():
+    """The old fence regex took ~0.56 s on 20,000 spaces and grew with the
+    square of the length (CodeQL py/polynomial-redos). 200,000 spaces would
+    have taken about a minute; parsing them must stay instant."""
+    import time
+
+    start = time.perf_counter()
+    with pytest.raises(nlquery.SpecError, match="not return a JSON object"):
+        nlquery.parse("{" + " " * 200_000 + "x")
+    assert time.perf_counter() - start < 0.5
+
+
 @pytest.mark.parametrize("text, rule", [
     (None, "no query spec"),
     ("   ", "no query spec"),
