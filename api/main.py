@@ -497,12 +497,17 @@ def _public_token_report(df: pd.DataFrame) -> dict:
     The reason quotes tiktoken's exception, which names the cache path under the
     system temp dir or the URL it failed to fetch. The local UI shows it as is;
     a client of the API only needs to know that nothing was measured.
+
+    The response is a new dict built from the count keys, not the report with
+    its reason overwritten, so the exception text has no path to the client at
+    all - which is also what lets CodeQL (py/stack-trace-exposure) see it.
     """
     report = token_report(df, "exposure")
+    public = {k: report[k] for k in ("toon_tokens", "json_tokens", "saving_pct", "available")}
     if not report["available"]:
         log.warning("token report unavailable: %s", report["reason"])
-        report["reason"] = "tiktoken unavailable; the server log has the details."
-    return report
+        public["reason"] = "tiktoken unavailable; the server log has the details."
+    return public
 
 
 class DraftRequest(BaseModel):

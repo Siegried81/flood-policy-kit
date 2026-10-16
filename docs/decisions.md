@@ -1900,3 +1900,24 @@ evidence; the threshold should then be revisited, not kept by habit.
   passes after; the WSL2 suite goes from 701 passed / 1 failed to 702 passed.
 - **What changes in the numbers:** nothing the analysis reports. Only the
   script's directory lookup moves, and its default path is unchanged.
+
+## 2026-10-16 — two CodeQL alerts closed: fence regex removed, token report rebuilt
+
+- **What:** `src/nlquery.py::parse` no longer strips a Markdown fence with a
+  regex; the first `{` and last `}` already skip it. `api/main.py::
+  _public_token_report` returns a new dict built from the count keys instead of
+  the report with its `reason` overwritten.
+- **Why:** CodeQL `py/polynomial-redos` (alert #4): the pattern
+  `` \s*```$ `` is quadratic on a long run of spaces in the model's text.
+  Measured: 0.036 s at 5,000 spaces, 0.147 s at 10,000, 0.564 s at 20,000;
+  `find`/`rfind` take microseconds. CodeQL `py/stack-trace-exposure` (alert #3):
+  the tiktoken exception text never reached the client (an existing test
+  proves it), but overwriting a key of the same dict left a path CodeQL
+  could not rule out; a fresh dict has none.
+- **Same pass:** `src/fetch.py::_HostThrottle.wait` sleeps in a loop until
+  `time.monotonic()` reaches the reserved slot. One `time.sleep` could return
+  a few ms early on Windows (15.6 ms clock ticks), so a host's Crawl-delay was
+  shaved: `test_the_larger_of_the_two_delays_wins` measured 0.297 s for 0.3 s
+  and failed 7 runs in 10 before, 0 in 10 after.
+- **What changes in the numbers:** nothing. Same specs parsed, same token
+  counts, same fixed reason when tiktoken is unavailable.

@@ -47,7 +47,6 @@ from __future__ import annotations
 
 import json
 import math
-import re
 from dataclasses import dataclass, field
 
 import pandas as pd
@@ -482,19 +481,18 @@ def prompt(question: str, df: pd.DataFrame) -> str:
     )
 
 
-_FENCE = re.compile(r"^```(?:json)?\s*|\s*```$", re.IGNORECASE)
-
-
 def parse(text: str | None) -> object:
     """The JSON object in a model answer, or `SpecError`.
 
     Tolerates a Markdown fence and prose around the object, because both are
     common and harmless; everything inside the braces is then validated as
-    strictly as a spec a person typed.
+    strictly as a spec a person typed. The first `{` and the last `}` are what
+    skip the fence: no regex, because a fence pattern ending in `\\s*` runs in
+    quadratic time on a long run of spaces, and the model's text is untrusted.
     """
     if not isinstance(text, str) or not text.strip():
         raise SpecError("the model returned no query spec")
-    body = _FENCE.sub("", text.strip())
+    body = text.strip()
     start, end = body.find("{"), body.rfind("}")
     if start < 0 or end <= start:
         raise SpecError("the model did not return a JSON object")
