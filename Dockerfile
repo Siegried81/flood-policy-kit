@@ -80,6 +80,11 @@ COPY --chown=app:app api/ ./api/
 COPY --chown=app:app config/ ./config/
 COPY --chown=app:app scripts/ ./scripts/
 COPY --chown=app:app templates/ ./templates/
+# The Streamlit "AI log" tab reads and appends to docs/ai_usage_log.md, and the
+# docs-numbers and legislation tests read README.md and docs/. Owned by `app` so
+# the log stays writable. pytest.ini carries the suite's warning filter.
+COPY --chown=app:app docs/ ./docs/
+COPY --chown=app:app README.md pytest.ini ./
 # Tests travel with the image on purpose: "pytest green with the Wi-Fi off" is a
 # line on the day-of checklist, and on this host it can only be run in here.
 COPY --chown=app:app tests/ ./tests/

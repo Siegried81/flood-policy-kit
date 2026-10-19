@@ -1921,3 +1921,37 @@ evidence; the threshold should then be revisited, not kept by habit.
   and failed 7 runs in 10 before, 0 in 10 after.
 - **What changes in the numbers:** nothing. Same specs parsed, same token
   counts, same fixed reason when tiktoken is unavailable.
+
+## 2026-10-19 — Linux test run: 1,141 warnings down to 0
+
+- **What:** `pytest.ini` (new) ignores one `PendingDeprecationWarning`, pinned
+  to its message and to the module `rasterstats.io`. In
+  `tests/test_offline_readiness.py` the regex tail `'"\)'` becomes `r'"\)'`.
+- **Why:** a fresh clone run on Linux (WSL2, Python 3.12, no `data/`) gave
+  703 passed with 1,141 warnings. 1,140 came from rasterstats 0.21 computing
+  `affine * (col, row)`, twice per zonal call, outside this repo; they buried
+  the one that was ours. That one is an invalid escape sequence: a
+  `SyntaxWarning` today, and `compile()` under `-W error` already raises
+  `SyntaxError: invalid escape sequence '\)'`. The regex itself matched
+  before and after, because Python keeps an unknown escape verbatim.
+- **Measured:** Linux, 703 passed / 1,141 warnings before, 703 passed / 0
+  warnings after. Windows venv (Python 3.14): 703 passed after.
+- **What changes in the numbers:** nothing. No test is skipped and no
+  assertion changes; the filter only hides that one third-party message.
+
+## 2026-10-19 — the image carries docs/, README.md and pytest.ini
+
+- **What:** the `app` stage of the `Dockerfile` copies `docs/` (owned by
+  `app`), `README.md` and `pytest.ini`, path by path like the rest.
+- **Why:** `app/streamlit_app.py` reads and appends to
+  `docs/ai_usage_log.md`, which the image did not hold. Measured in the
+  container: `usage_log.append_row` raised `FileNotFoundError`, so "Add entry"
+  in the AI log tab failed on the published image, while the tab showed no
+  log. The same absence was the "4 not yet diagnosed" failures of
+  `docker compose run test`: three `test_docs_numbers.py` tests and one
+  `test_legislation.py` test read `README.md` and `docs/`.
+- **Measured:** `docker compose --profile tools run --rm test`, 699 passed /
+  4 failed / 1,140 warnings before, 703 passed / 0 failed / 0 warnings after.
+  `append_row` on `/app/docs/ai_usage_log.md` succeeds in the rebuilt image.
+- **What changes in the numbers:** nothing. An entry logged in a container
+  lives in that container unless `docs/` is mounted from the host.
