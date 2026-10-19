@@ -357,7 +357,7 @@ def test_the_code_default_matches_what_rag_py_asks_for():
     import re
 
     source = (ROOT / "src" / "rag.py").read_text(encoding="utf-8")
-    assert re.search(r'os\.getenv\("OLLAMA_MODEL",\s*"' + re.escape(readiness.RAG_DEFAULT_OLLAMA_MODEL) + '"\)', source)
+    assert re.search(r'os\.getenv\("OLLAMA_MODEL",\s*"' + re.escape(readiness.RAG_DEFAULT_OLLAMA_MODEL) + r'"\)', source)
 
 
 def test_wrong_tag_in_the_same_family_suggests_the_one_word_fix(monkeypatch):

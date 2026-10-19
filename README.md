@@ -145,11 +145,11 @@ climate dry-run test that used to read the CDS files already in `data/` now
 honours its patched directory). The WSL2 venv stays, because it is the only route that does
 not depend on the policy's mood and it is where a continental raster build
 belongs. **The `app` image was built and run on 2026-10-12:** `rasterio`,
-`pyogrio`, `rasterstats` and `tiktoken` all import inside it. Run there without
-`data/` or `.env`, the suite gave 562 passed and 7 failed, every failure a
-provider test reading the `OLLAMA_URL` that Compose sets (fixed since, merged
-in PR #6). Through `docker compose run test` it gave 558
-passed and 11 failed: the same 7, and 4 not yet diagnosed. An image built on
+`pyogrio`, `rasterstats` and `tiktoken` all import inside it. Measured
+2026-10-19, `docker compose --profile tools run --rm test` on a fresh build
+gives 703 passed, 0 failed, without `data/` or `.env`; the image now carries
+`docs/`, `README.md` and `pytest.ini`, which four tests and the AI log tab
+read. An image built on
 2026-10-09 could not import `rasterio` (`libexpat.so.1` missing) while a fresh
 build of the same Dockerfile can, so rebuild rather than trust an old local
 image: `docker compose build`. The `portable` image has not been built yet.
