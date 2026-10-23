@@ -303,6 +303,8 @@ geodata:
   - id: wallonia_observed_water_depth_2021
     url: https://geoservices.wallonie.be/geotraitement/spwdatadownload/results/59f97c7e-c501-4e92-8c47-047d000f4c13/
     access: download
+    # The url names no file type; the job served a ZIP (GeoTIFF + overview).
+    suffix: .zip
     crs: EPSG:31370
     licence: CC-BY-4.0
     purpose: >
@@ -319,7 +321,12 @@ geodata:
       record: "Zones inondees IDW - Hauteur d'eau - juillet 2021" (the dataset,
       not its WMS/REST visualisation services); download as GeoTIFF in
       EPSG:31370, paste the new results url above and bump `verified`.
-    verified: 2026-10-06 (record identified; download link expired by 2026-10-10)
+    verified: 2026-10-06 (record identified; download link expired by 2026-10-10).
+      The file on disk is a by-hand download of the same record made 2026-10-10
+      (ZONES_INONDEES_202107_IDW450_HEAU_GEOTIFF_31370.zip, 500,736,096 B,
+      ZONES_INONDEES_2021_IDW450_HEAU.tif inside), renamed 2026-10-23 to the
+      name this entry resolves to. Its manifest url is the expired job's, not
+      the job that served it.
 
   - id: gisco_nuts3
     url: https://gisco-services.ec.europa.eu/distribution/v2/nuts/geojson/NUTS_RG_01M_2024_3035_LEVL_3.geojson

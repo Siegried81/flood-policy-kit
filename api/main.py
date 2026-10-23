@@ -42,7 +42,7 @@ from pydantic import BaseModel, Field
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src import nlquery, rag, translate  # noqa: E402
-from src.toon_io import flatten, to_toon, token_report  # noqa: E402
+from src.toon_io import fit_rows, flatten, to_toon, token_report  # noqa: E402
 from src.demographics import LEGACY_COLUMNS, with_current_names  # noqa: E402
 from src.vulnerability import sensitivity  # noqa: E402
 
@@ -106,7 +106,8 @@ def _table() -> pd.DataFrame:
             status_code=404,
             detail="No exposure table. Build one with `python scripts/build_exposure.py`, "
                    "which writes data/processed/exposure.parquet. It needs the rasters "
-                   "`python -m src.fetch` downloads; data/ is not committed.",
+                   "`python -m src.fetch` downloads. The frozen table is committed, so a "
+                   "checkout without it is older than that commit; the rasters never are.",
         )
     # Under the current column names whichever build froze it: a table from
     # before the units rename still says `poverty_rate`. See `LEGACY_COLUMNS`.
@@ -197,6 +198,9 @@ def meta() -> dict:
         "has_geometry": GEOMETRY.exists(),
         "has_context": CONTEXT.exists(),
         "corpus_passages": len(rag.load_index().passages),
+        # Whether, never what: the UI shows a token field only when approve
+        # will ask for one, and the secret stays in the approver's head.
+        "approve_token_required": bool(os.environ.get("FLOOD_APPROVE_TOKEN")),
     }
 
 
@@ -269,8 +273,9 @@ def _context() -> pd.DataFrame:
             status_code=404,
             detail="No context table. Build one with `python scripts/build_context.py`, "
                    "which writes data/processed/context.parquet. It needs the hazard "
-                   "rasters and the CDS NetCDFs `python -m src.fetch` downloads; data/ "
-                   "is not committed.",
+                   "rasters and the CDS NetCDFs `python -m src.fetch` downloads. The frozen "
+                   "table is committed, so a checkout without it is older than that "
+                   "commit; the rasters never are.",
         )
     return pd.read_parquet(CONTEXT)
 
@@ -440,6 +445,15 @@ def vulnerability(req: VulnerabilityRequest) -> dict:
             detail=f"Not vulnerability indicators: {scenario}. These describe the "
                    "flood scenario, not the people exposed to it.",
         )
+    # The accept list is the offer list: a key or a text column cannot be
+    # min-max scaled, and one stored as a string ranked every region at zero.
+    offered = vulnerability_indicators(df)
+    not_numeric = [c for c in req.indicators if c not in offered]
+    if not_numeric:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Not numeric indicators: {not_numeric}. Pick from {offered}.",
+        )
 
     df, period, defaulted = _one_return_period(df, req.return_period)
     ranked = sensitivity(
@@ -512,7 +526,9 @@ def _public_token_report(df: pd.DataFrame) -> dict:
 
 class DraftRequest(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
+    # An upper bound: the prompt budget usually cuts the table shorter.
     rows: int = Field(default=200, ge=1, le=2000)
+    return_period: int | None = None
 
 
 @app.post("/api/draft")
@@ -527,13 +543,41 @@ def draft(req: DraftRequest) -> dict:
     if not passages:
         return {"refused": True, "draft": None, "passages": []}
 
+    # One scenario, the same rule as every other route: the periods are nested,
+    # so a table mixing them is no reading the brief can quote. Then ranked by
+    # share, because the rows have to be chosen by something and file order
+    # (Albania to Germany at the 10-year period) is not a criterion.
+    df, period, _ = _one_return_period(_table(), req.return_period)
+    key = _region_key(df)
+    regions = df[key].nunique()
+    # Without a population there is no share, so the rows keep file order and the
+    # note below must not claim a ranking it did not make.
+    ranked = {"exposed_pop", "total_pop"} <= set(df.columns)
+    if ranked:
+        df = df.assign(exposed_share=df["exposed_pop"] / df["total_pop"]).sort_values(
+            "exposed_share", ascending=False
+        )
     # flatten() before encoding, because it is the only thing that drops
     # `geometry` - and the frozen table is saved from a GeoDataFrame, so the
     # column is there. A polygon is thousands of tokens of coordinates the model
     # can do nothing with, times `rows`, and it would be the bulk of the prompt.
-    df = flatten(_table().head(req.rows))
+    #
+    # Then cut to the provider's per-minute budget, which `rag` owns: past it
+    # Groq answers 413 and every draft falls to the small local model.
+    fenced = rag.fence(passages)
+    note = (
+        (f"TABLE NOTE: the most exposed of {regions} regions" if ranked
+         else f"TABLE NOTE: rows from {regions} regions, in file order")
+        + (f" at the 1-in-{period} year return period" if period else "")
+        + (", ranked by the share of their own population exposed" if ranked else "")
+        + ". This is an extract, not the whole table: do not state a European total "
+        "or a count of regions from it."
+    )
+    head = f"QUESTION: {req.question}\n\n{note}\nTABLE:\n"
+    budget = rag.PROMPT_CHAR_BUDGET - len(rag.SYSTEM_PROMPT) - len(head) - len(fenced) - 2
+    df = fit_rows(flatten(df.head(req.rows)), "exposure", max(budget, 0))
     table = to_toon(df, "exposure")
-    prompt = f"QUESTION: {req.question}\n\nTABLE:\n{table}\n\n{rag.fence(passages)}"
+    prompt = f"{head}{table}\n\n{fenced}"
     try:
         text = rag.complete(prompt)
     except Exception as exc:
@@ -559,6 +603,9 @@ def draft(req: DraftRequest) -> dict:
         "grounding": round(rag.grounding_score(text, passages), 4),
         "invalid_citations": rag.invalid_citations(text, len(passages)),
         "tokens": _public_token_report(df),
+        "return_period": period,
+        "prompt_rows": len(df),
+        "ranked": ranked,
     }
 
 

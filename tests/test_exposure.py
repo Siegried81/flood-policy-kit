@@ -490,6 +490,29 @@ def test_a_finished_return_period_is_parked_before_the_next_one_starts(tmp_path)
     assert _part_path(500, mode="fraction", min_depth_m=0.5, masks=["a", "b"]) != base
 
 
+def test_keeping_one_mask_or_the_other_is_two_different_parts():
+    """`--keep-permanent-water` and `--keep-spurious-areas` each leave ONE mask.
+
+    A name built from the mask count alone gave both runs the same file, so the
+    second silently reused the first one's numbers.
+    """
+    from scripts.build_exposure import PERMANENT_WATER, SPURIOUS_AREAS, _part_path
+
+    water_only = _part_path(100, mode="fraction", min_depth_m=0.5, masks=[PERMANENT_WATER])
+    spurious_only = _part_path(100, mode="fraction", min_depth_m=0.5, masks=[SPURIOUS_AREAS])
+    assert water_only != spurious_only
+
+
+def test_the_default_parts_keep_the_name_they_were_built_under():
+    """Both masks (the default) and no mask keep their names, so the nine parts
+    already on disk are still found and a rerun does not recompute them."""
+    from scripts.build_exposure import PERMANENT_WATER, SPURIOUS_AREAS, _part_path
+
+    both = _part_path(100, mode="fraction", min_depth_m=0.5, masks=[PERMANENT_WATER, SPURIOUS_AREAS])
+    assert both.name == "rp100_fraction_d0.5_m2.parquet"
+    assert _part_path(100, mode="fraction", min_depth_m=0.5, masks=[]).name == "rp100_fraction_d0.5_m0.parquet"
+
+
 def test_a_targeted_rebuild_does_not_shrink_the_frozen_table():
     """`--return-period` narrows what is COMPUTED, never what is written.
 

@@ -196,17 +196,18 @@ def ensemble_change_by_region(
       is defensible where this is True and is not where it is False, whatever
       the median says.
 
-    All the files must describe the same variable, the same kind of change and
-    the same period - members differ in the model chain and in nothing else.
-    Mixing 2041-2070 with 2071-2100 would produce a median of two different
-    questions, so it raises instead.
+    All the files must describe the same variable, the same kind of change, the
+    same period and the same emissions scenario - members differ in the model
+    chain and in nothing else. Mixing 2041-2070 with 2071-2100, or RCP4.5 with
+    RCP8.5, would produce a median of two different questions, so it raises
+    instead.
     """
     paths = [Path(p) for p in paths]
     if not paths:
         raise ValueError("No files given: an ensemble of nothing has no median.")
 
     fields = [describe(p) for p in paths]
-    for key in ("variable", "kind", "period", "reference"):
+    for key in ("variable", "kind", "experiment", "period", "reference"):
         values = {f[key] for f in fields}
         if len(values) > 1:
             raise ValueError(

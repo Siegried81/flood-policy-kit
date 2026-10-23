@@ -10,20 +10,21 @@ import { approve, draft as requestDraft } from "../api.js";
  * This is also the clearest thing to show a jury asking what stopped the model
  * writing the brief by itself.
  */
-export default function DraftPanel() {
+export default function DraftPanel({ returnPeriod, approveTokenRequired = false }) {
   const [question, setQuestion] = useState("");
   const [result, setResult] = useState(null);
   const [edited, setEdited] = useState("");
   const [state, setState] = useState("idle");
   const [error, setError] = useState(null);
   const [approved, setApproved] = useState(null);
+  const [token, setToken] = useState("");
 
   const run = async () => {
     setState("working");
     setError(null);
     setApproved(null);
     try {
-      const body = await requestDraft(question);
+      const body = await requestDraft(question, returnPeriod);
       setResult(body);
       setEdited(body.draft ?? "");
     } catch (e) {
@@ -38,7 +39,7 @@ export default function DraftPanel() {
       // The edited text is sent exactly as the human left it. It is deliberately
       // never passed back through the model to polish, which would hand the last
       // word to the machine.
-      const body = await approve(edited);
+      const body = await approve(edited, token);
       setApproved(body.approved_at);
     } catch (e) {
       setError(e.message);
@@ -117,6 +118,16 @@ export default function DraftPanel() {
             </p>
           )}
 
+          {result.prompt_rows != null && (
+            <p className="caption">
+              The model read {result.prompt_rows}{" "}
+              {result.ranked ? "most exposed regions" : "regions, in file order,"}
+              {result.return_period ? ` at the 1-in-${result.return_period} year flood` : ""}
+              {result.ranked ? ", ranked by share" : ""} — an extract, so any
+              European total in the draft is not from the table.
+            </p>
+          )}
+
           <p className="caption">
             Grounding counts shared words, not meaning: it catches an answer
             drifting away from its sources, not a subtle misreading that reuses
@@ -141,7 +152,23 @@ export default function DraftPanel() {
           />
 
           <div className="row">
-            <button className="primary" onClick={send} disabled={!edited.trim()}>
+            {/* Shown only when the server asks for it; held in this component's
+                state for the session and never written anywhere. */}
+            {approveTokenRequired && (
+              <input
+                type="password"
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                placeholder="Approve token"
+                aria-label="Approve token"
+                autoComplete="off"
+              />
+            )}
+            <button
+              className="primary"
+              onClick={send}
+              disabled={!edited.trim() || (approveTokenRequired && !token)}
+            >
               Approve for the brief
             </button>
             {weak && (

@@ -321,11 +321,12 @@ class Completion:
     `provider` exists because "Groq answered" and "the local model answered after
     Groq died" are different facts about a brief, and the human at the approval
     gate is entitled to know which one they are reading. `fallback_reason` is the
-    Groq failure that caused the switch, or None when no switch happened.
+    failure that caused the switch - every one, in order, when Claude and then
+    Groq both gave way - or None when no switch happened.
     """
 
     text: str
-    provider: str  # "groq" or "ollama"
+    provider: str  # "anthropic", "groq" or "ollama"
     fallback_reason: str | None = None
 
 
@@ -352,6 +353,11 @@ def _text_or_raise(content: object, provider: str) -> str:
 #: What it does NOT do is let a bigger prompt through: one request is still
 #: capped at 8,000 tokens whichever key carries it. See `_groq_once`.
 GROQ_KEY_VARS = ("GROQ_API_KEY", *(f"GROQ_API_KEY_{n}" for n in range(2, 6)))
+
+#: The local model when `OLLAMA_MODEL` is unset or blank: the one the demo laptop
+#: pulls. Named here so the offline-readiness check imports it rather than
+#: restating it, and certifies the model this module actually asks for.
+OLLAMA_DEFAULT_MODEL = "llama3.2:3b"
 
 #: The characters a prompt may use, so that the prompt AND the completion fit
 #: inside the provider's PER-MINUTE token budget - not its context window, which
@@ -381,7 +387,7 @@ def _groq_once(prompt: str, system: str, key_var: str) -> str:
         "https://api.groq.com/openai/v1/chat/completions",
         headers={"Authorization": f"Bearer {os.environ[key_var]}"},
         json={
-            "model": os.getenv("GROQ_MODEL", "openai/gpt-oss-120b"),
+            "model": os.getenv("GROQ_MODEL", "").strip() or "openai/gpt-oss-120b",
             "messages": _messages(prompt, system),
             "temperature": 0.2,
         },
@@ -461,12 +467,12 @@ def _ollama(prompt: str, system: str) -> str:
     import requests
 
     response = requests.post(
-        f"{os.getenv('OLLAMA_URL', 'http://localhost:11434')}/api/chat",
+        f"{os.getenv('OLLAMA_URL', '').strip() or 'http://localhost:11434'}/api/chat",
         json={
             # The default is the model the demo laptop actually has pulled, so a
             # container started without .env asks Ollama for the same name as
             # the host. scripts/check_offline_readiness.py restates it.
-            "model": os.getenv("OLLAMA_MODEL", "llama3.2:3b"),
+            "model": os.getenv("OLLAMA_MODEL", "").strip() or OLLAMA_DEFAULT_MODEL,
             "messages": _messages(prompt, system),
             "stream": False,
         },
@@ -479,6 +485,69 @@ def _ollama(prompt: str, system: str) -> str:
     except KeyError as exc:
         raise EmptyCompletion("ollama sent a response with no message in it") from exc
     return _text_or_raise(content, "ollama")
+
+
+#: Opus by default: the brief is the deliverable and one section is one call, so
+#: the strongest writer is worth its price there ($4/$20 per MTok against
+#: Haiku's $0.10/$0.50). It thinks before it answers, so it is also the slowest;
+#: a call past the 90 s timeout is a connection error and falls back like one.
+#: `ANTHROPIC_MODEL` in `.env` picks another model without touching the code.
+ANTHROPIC_DEFAULT_MODEL = "claude-opus-5-5"
+
+
+def _anthropic(prompt: str, system: str) -> str:
+    """One call to Claude through the official SDK. Single call, no tool loop.
+
+    `max_retries=0` because the fallback chain IS the retry: a 429 or a 529 goes
+    straight to Groq, then Ollama, instead of the SDK's backoff holding the jury
+    for seconds before the same answer arrives from somewhere else. No
+    `temperature`: the current models reject a non-default value with a 400.
+    The text is the `text` blocks alone - with adaptive thinking on by
+    default, the response can also hold `thinking` blocks, which are not the
+    answer. A refusal comes back as HTTP 200 with no text, so it raises
+    `EmptyCompletion` like any other answer with nothing in it.
+    """
+    import anthropic
+
+    client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"], max_retries=0, timeout=90)
+    response = client.messages.create(
+        # `or`, not a getenv default: a blank `ANTHROPIC_MODEL=` is set, and ""
+        # is a model name the API refuses with a 400 that does not fall back.
+        model=os.getenv("ANTHROPIC_MODEL", "").strip() or ANTHROPIC_DEFAULT_MODEL,
+        max_tokens=16000,
+        system=system,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    if response.stop_reason == "refusal":
+        raise EmptyCompletion("anthropic declined the request (stop_reason: refusal)")
+    text = "".join(block.text for block in response.content if block.type == "text")
+    return _text_or_raise(text, "anthropic")
+
+
+def _anthropic_fallback_reason(exc: Exception) -> str | None:
+    """Why Groq or Ollama should take over from Claude, or None to re-raise.
+
+    The same split as `_fallback_reason`: a rate limit, an overloaded or failing
+    server (any 5xx, 529 included) and a dead network are "this minute", and the
+    next provider can answer. A 400, 401, 403 or 404 is a wrong key or a model
+    name that does not exist, still wrong tomorrow, so it stays loud.
+
+    **An empty credit balance is the first kind wearing a 400**, as a 413 is for
+    Groq: the key and the model are right, the account is out of credit, and
+    the next provider can answer. It is told apart by the API's own message,
+    since the status and the error type are those of a malformed request.
+    """
+    import anthropic
+
+    if isinstance(exc, anthropic.BadRequestError) and "credit balance" in str(exc).lower():
+        return "anthropic refused the request: the credit balance is too low (HTTP 400)"
+    if isinstance(exc, anthropic.RateLimitError):
+        return "anthropic rate-limited the request (HTTP 429)"
+    if isinstance(exc, anthropic.APIStatusError) and exc.status_code >= 500:
+        return f"anthropic failed server-side (HTTP {exc.status_code})"
+    if isinstance(exc, anthropic.APIConnectionError):
+        return f"anthropic was unreachable ({type(exc).__name__})"
+    return None
 
 
 def _fallback_reason(exc: Exception) -> str | None:
@@ -535,7 +604,29 @@ def _tpm_hint(exc: Exception) -> str:
 
 
 def complete_with_provider(prompt: str, system: str = SYSTEM_PROMPT) -> Completion:
-    """One structured call to whichever provider is configured, Groq first.
+    """One structured call to whichever provider is configured: Claude, Groq, Ollama.
+
+    Claude is tried first when `ANTHROPIC_API_KEY` is set, because that key is
+    paid credit put there to be used. A transient Claude failure hands the same
+    prompt to the Groq-then-Ollama chain below, inside the `except`, so a total
+    outage still chains every failure into the traceback. A configuration error
+    raises without trying anything else.
+    """
+    if not os.getenv("ANTHROPIC_API_KEY", "").strip():
+        return _groq_then_ollama(prompt, system)
+    try:
+        return Completion(_anthropic(prompt, system), "anthropic")
+    except Exception as exc:
+        reason = _anthropic_fallback_reason(exc)
+        if reason is None:
+            raise
+        fallback = _groq_then_ollama(prompt, system)
+    reasons = "; ".join(r for r in (reason, fallback.fallback_reason) if r)
+    return Completion(fallback.text, fallback.provider, reasons)
+
+
+def _groq_then_ollama(prompt: str, system: str) -> Completion:
+    """Groq when a key is set, the local model when it is not or when Groq fails.
 
     Having a local fallback is not a nicety here: a rate limit or a dead venue
     network in the middle of the jury session is the realistic failure, and

@@ -98,7 +98,11 @@ and **must never be summed** — adding RP10 + RP100 + RP500 triple-counts the c
 floodplain and produces a number larger than the population of the region.
 Report each separately, or integrate across probability with
 `exposure.expected_annual_exposure`, which is the probability-weighted version
-and the entry point to any cost-benefit argument.
+and the entry point to any cost-benefit argument. The nesting is the intent of
+the maps, not a property of every cell: each JRC raster is its own model run,
+and four regions count fewer people at a rarer period (see
+[`limitations.md`](limitations.md)). Never sum them, and never promise the figure
+only grows.
 
 One honesty note that belongs next to every return period in this kit: the JRC
 maps model **river flooding only**, in basins larger than 150 km². The surface

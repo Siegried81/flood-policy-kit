@@ -19,10 +19,10 @@ async function request(path, options) {
   return resp.json();
 }
 
-const post = (path, body) =>
+const post = (path, body, headers = {}) =>
   request(path, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...headers },
     body: JSON.stringify(body),
   });
 
@@ -57,7 +57,10 @@ export const getVulnerability = (indicators, perturbation, topN, returnPeriod) =
 export const search = (q, k = 5) =>
   request(`/api/search?q=${encodeURIComponent(q)}&k=${k}`);
 
-export const draft = (question) => post("/api/draft", { question });
+// The period on screen travels with the question, so the model reads the scenario
+// the reader is looking at.
+export const draft = (question, returnPeriod) =>
+  post("/api/draft", { question, return_period: returnPeriod ?? null });
 
 // Fetched rather than hardcoded in the panel: the list lives in
 // `src/translate.py`, and a copy in the client would drift the moment a language
@@ -73,4 +76,9 @@ export const translate = (text, language) =>
 // The only call that writes to the brief. Kept separate from `draft` on purpose:
 // generating and approving are different acts, and the API makes that structural
 // rather than a matter of discipline.
-export const approve = (text) => post("/api/approve", { text });
+//
+// The token, when the server asks for one, is typed by the person approving and
+// sent per call. It is never built into the bundle: a secret in the JavaScript
+// is a secret every visitor of the page holds.
+export const approve = (text, token) =>
+  post("/api/approve", { text }, token ? { "X-Approve-Token": token } : {});

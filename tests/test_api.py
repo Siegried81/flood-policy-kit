@@ -227,6 +227,20 @@ def test_a_scenario_column_is_refused_as_an_indicator(client):
     assert "annual_probability" in response.json()["detail"]
 
 
+
+@pytest.mark.parametrize("column", ["nuts_id", "region_label"])
+def test_a_column_that_is_not_a_number_is_refused_as_an_indicator(client, frozen, column):
+    """The accept list was "any column", so the join key crashed the scaling
+    with a 500 and a text column (a year stored as a string) came back 200 with
+    a ranking of zeros. Only what `/api/meta` offers can be weighted."""
+    table = _nested_table()
+    table["region_label"] = ["Arr. Bruxelles", "Halle-Vilvoorde", "Leuven"] * 3
+    frozen(table)
+    response = client.post("/api/vulnerability", json={"indicators": ["exposed_pop", column]})
+    assert response.status_code == 400
+    assert column in response.json()["detail"]
+
+
 # --- one indicator list, two UIs ------------------------------------------------
 
 def test_scenario_columns_are_never_offered_as_indicators():
@@ -335,6 +349,65 @@ def test_geometry_never_reaches_the_prompt(client, frozen, monkeypatch):
     assert all(len(line) < 120 for line in table_block.splitlines())
 
 
+def _prompt_rows(prompt: str) -> list[dict]:
+    """The prompt's TOON table block, one dict per row, keyed by its header."""
+    block = prompt.split("TABLE:\n", 1)[1].split("\n\n", 1)[0].splitlines()
+    header = block[0].split("{", 1)[1].split("}", 1)[0].split(",")
+    return [dict(zip(header, line.strip().split(","))) for line in block[1:] if line.strip()]
+
+
+def test_a_draft_sees_one_scenario_ranked_by_share(client, monkeypatch):
+    """The defect: `_table().head(rows)` is file order, so the model read the
+    first 200 rows - Albania to Germany at the 10-year period - whatever the
+    page showed. No period now means the rarest one, as on every other route,
+    and the rows are the most exposed by share, not the first alphabetically."""
+    seen = _stub_model(monkeypatch)
+    body = client.post("/api/draft", json={"question": "flood risk plans?"}).json()
+    assert body["return_period"] == 500
+    rows = _prompt_rows(seen["prompt"])
+    assert len(rows) == 3, "one row per region, not one per region x period"
+    # RP500 shares: BE33 0.21, BE31 0.07, BE32 0.014.
+    assert [r["nuts_id"] for r in rows] == ["BE33", "BE31", "BE32"]
+    assert "ranked by the share" in seen["prompt"] and "1-in-500" in seen["prompt"]
+    assert body["ranked"] is True
+
+
+def test_a_draft_never_claims_a_ranking_it_did_not_make(client, frozen, monkeypatch):
+    """Without `total_pop` there is no share to rank by, so the rows stay in file
+    order - and the prompt and the panel must not call them "ranked by share"."""
+    frozen(pd.DataFrame({"nuts_id": ["A", "B", "C"], "exposed_pop": [1.0, 900.0, 50.0]}))
+    seen = _stub_model(monkeypatch)
+    body = client.post("/api/draft", json={"question": "flood risk plans?"}).json()
+    assert body["ranked"] is False
+    assert "ranked" not in seen["prompt"].split("TABLE:")[0]
+    assert "not the whole table" in seen["prompt"]
+
+
+def test_a_draft_follows_the_period_the_reader_chose(client, monkeypatch):
+    seen = _stub_model(monkeypatch)
+    body = client.post("/api/draft", json={"question": "q?", "return_period": 10}).json()
+    assert body["return_period"] == 10
+    assert sorted(float(r["exposed_pop"]) for r in _prompt_rows(seen["prompt"])) == [75.0, 675.0, 750.0]
+    assert client.post("/api/draft", json={"question": "q?", "return_period": 7}).status_code == 400
+
+
+def test_a_draft_prompt_stays_inside_the_provider_budget(client, frozen, monkeypatch):
+    """200 rows of the real table were 29,613 characters against an 11,000
+    budget, so every draft over Groq came back 413 and fell to the small local
+    model. The table is cut to what the budget leaves."""
+    big = pd.DataFrame({
+        "nuts_id": [f"XX{i:04d}" for i in range(2000)],
+        "exposed_pop": [float(i) for i in range(2000)],
+        "total_pop": [10_000.0] * 2000,
+        "return_period": [100] * 2000,
+        "annual_probability": [0.01] * 2000,
+    })
+    frozen(big)
+    seen = _stub_model(monkeypatch)
+    client.post("/api/draft", json={"question": "flood risk plans?", "rows": 2000})
+    assert len(seen["prompt"]) + len(api.rag.SYSTEM_PROMPT) <= api.rag.PROMPT_CHAR_BUDGET
+
+
 def test_the_token_report_describes_the_table_actually_sent(client, frozen, monkeypatch):
     """Reported on the unflattened frame, the saving was a measurement of a prompt
     that is not the one the model received."""
@@ -432,6 +505,38 @@ def test_meta_reports_the_periods_and_the_offer_list(client, monkeypatch):
     assert body["indicators"] == ["exposed_pop", "share_over_65"]
     assert body["regions"] == 3
     assert body["rows"] == 9
+
+
+def test_meta_says_whether_approve_needs_a_token_and_never_what_it_is(client, monkeypatch):
+    """The React approve button sent no token, so setting FLOOD_APPROVE_TOKEN as
+    `.env.example` advises turned every approval into a 403. The UI now asks the
+    approver for it - when, and only when, meta says the server will check."""
+    monkeypatch.setattr(api.rag, "load_index", lambda *a, **k: type("I", (), {"passages": []})())
+    monkeypatch.delenv("FLOOD_APPROVE_TOKEN", raising=False)
+    assert client.get("/api/meta").json()["approve_token_required"] is False
+    monkeypatch.setenv("FLOOD_APPROVE_TOKEN", "s3cret-test-value")
+    response = client.get("/api/meta")
+    assert response.json()["approve_token_required"] is True
+    assert "s3cret-test-value" not in response.text
+
+
+
+def test_the_react_map_carries_the_boundary_credit():
+    """The GISCO terms require the EuroGeographics line on any map drawn from
+    the NUTS boundaries; `svgmap` draws it into the Streamlit map, and the
+    React map has to say it in its own caption."""
+    source = (ROOT / "web" / "src" / "components" / "Choropleth.jsx").read_text(encoding="utf-8")
+    caption = source.split("<figcaption>", 1)[1].split("</figcaption>", 1)[0]
+    assert "© EuroGeographics for the administrative boundaries" in caption
+
+
+def test_the_react_approve_call_carries_the_token_header():
+    """The server reads `X-Approve-Token`; a client that never sends it cannot
+    approve once the token is set. Pinned on the source, as the other JSX guards are."""
+    client_js = (ROOT / "web" / "src" / "api.js").read_text(encoding="utf-8")
+    assert '"X-Approve-Token": token' in client_js
+    panel = (ROOT / "web" / "src" / "components" / "DraftPanel.jsx").read_text(encoding="utf-8")
+    assert "approve(edited, token)" in panel and 'type="password"' in panel
 
 
 def test_no_table_is_a_404_that_says_how_to_build_one(tmp_path, monkeypatch):

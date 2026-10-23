@@ -27,8 +27,10 @@ Three choices here are load-bearing:
   reads two, `nuts_id` and `name`. The rest is bytes a browser downloads on
   every page load and never looks at.
 
-The output is a derived file, like `exposure.parquet`: `data/` is gitignored, so
-this runs after `python -m src.fetch` and before the first demo.
+The output is a derived file and, unlike `exposure.parquet`, it is not
+committed: it is a copy of the GISCO geometry, whose terms do not let a public
+repository pass it on (`data/processed/DATA_NOTICE.md`). So this runs after
+`python -m src.fetch` and before the first demo, on every machine.
 """
 
 from __future__ import annotations
@@ -137,7 +139,7 @@ def main() -> int:
         raise SystemExit(
             f"{args.source} is missing. Run `python -m src.fetch` first: the "
             f"boundaries are declared as `gisco_nuts3` in config/sources.yaml and "
-            f"`data/` is not committed."
+            f"`data/raw/` is not committed."
         )
 
     collection = build(args.source, args.tolerance_m, args.decimals)
@@ -147,8 +149,10 @@ def main() -> int:
     args.out.write_text(
         json.dumps(collection, separators=(",", ":")), encoding="utf-8"
     )
+    # relative_to(ROOT) raises on a relative `--out`, after the file is written.
+    shown = args.out.relative_to(ROOT) if args.out.is_relative_to(ROOT) else args.out
     print(
-        f"{args.out.relative_to(ROOT)}: {len(collection['features'])} regions, "
+        f"{shown}: {len(collection['features'])} regions, "
         f"{args.out.stat().st_size / 1e6:.1f} MB, simplified at "
         f"{args.tolerance_m:g} m, keyed on `{FIELDS['NUTS_ID']}`"
     )

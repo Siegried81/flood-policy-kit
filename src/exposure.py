@@ -354,10 +354,13 @@ def exposure_by_return_period(
     plotting, the LLM prompt (see `toon_io`), and the expected-annual-damage
     calculation, which needs the probability attached to each row.
 
-    Return-period extents are NESTED: the 100-year flood zone contains the
-    10-year one. So these rows must never be added together - summing RP10 +
+    Return-period extents are NESTED in intent: the 100-year flood zone contains
+    the 10-year one. So these rows must never be added together - summing RP10 +
     RP100 + RP500 triple counts the core floodplain. Report each separately, or
-    integrate over probability with `expected_annual_exposure`.
+    integrate over probability with `expected_annual_exposure`. They are not
+    nested cell by cell, though: each JRC raster is its own model run, and a few
+    regions count fewer people at a rarer period. So never assert that the
+    figure only grows with the return period either.
     """
     frames = []
     for return_period, path in sorted(hazard_paths.items()):

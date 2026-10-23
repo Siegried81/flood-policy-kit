@@ -196,9 +196,16 @@ context = load_context()
 st.title("Flood exposure across European regions")
 
 if exposure is None:
+    # The frozen table is committed, so the machines that land here are a
+    # checkout older than that commit or a container started without `./data`
+    # mounted. Pulling, or mounting, is the fix; a rebuild is the slow last resort.
     st.warning(
-        f"No exposure table yet. Build one with `src.exposure.exposure_by_return_period` "
-        f"and save it to `{EXPOSURE_CACHE.relative_to(Path.cwd()) if EXPOSURE_CACHE.is_relative_to(Path.cwd()) else EXPOSURE_CACHE}`. "
+        f"No exposure table yet at `{EXPOSURE_CACHE.relative_to(Path.cwd()) if EXPOSURE_CACHE.is_relative_to(Path.cwd()) else EXPOSURE_CACHE}`. "
+        "The frozen table is committed with the code, so this checkout predates it "
+        "(`git pull`), or this container was started without `./data` mounted "
+        "(`docker compose up` from the repository). Rebuilding it with "
+        "`python scripts/build_exposure.py` is the slow route: it needs the 5.5 GiB "
+        "of rasters from `python -m src.fetch` and about 20 GB of RAM. "
         "See docs/scope.md for the European setup."
     )
     st.stop()
@@ -312,7 +319,8 @@ with map_tab:
             "No polygons to draw. Build them with "
             "`python scripts/build_geometry.py`, which writes "
             "`data/processed/regions.geojson` in seconds from one boundary file. "
-            "`data/` is not committed, so a fresh clone has to build it."
+            "It is not committed - the GISCO boundary terms do not let the "
+            "repository pass the polygons on - so each machine builds its own."
         )
     elif key != "nuts_id":
         st.info(
@@ -1075,7 +1083,7 @@ with log_tab:
         checked = columns[2].text_input("What a human checked")
         outcome = columns[3].selectbox("Outcome", ["accepted", "accepted after fix", "rejected"])
         if st.form_submit_button("Add entry") and tool:
-            row = f"| {datetime.now():%a %H:%M} | {tool} | {task} | {checked} | {outcome} |\n"
+            row = usage_log.table_row([f"{datetime.now():%a %H:%M}", tool, task, checked, outcome])
             usage_log.append_row(log_path, row)
             st.success("Logged.")
     if log_path.exists():

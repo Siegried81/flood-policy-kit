@@ -102,6 +102,29 @@ def test_a_stale_rejection_page_on_disk_is_quarantined_and_refetched(workspace):
     assert target.read_bytes() == b"payload" * 400
 
 
+def test_a_locked_stale_file_is_a_failed_result_not_a_crash(workspace, monkeypatch):
+    """Moving the stale file aside can raise PermissionError on Windows when
+    something holds it open. Escaping `_fetch_one` would kill `fetch_all` and
+    lose the manifest, so it has to come back as a failed result like any other."""
+    from pathlib import Path
+
+    target = F._target_path("src1", "https://example.org/1.tif", "download")
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"<title>Request Rejected</title>")
+
+    def locked(self, other):
+        raise PermissionError("[WinError 32] file in use")
+
+    monkeypatch.setattr(Path, "replace", locked)
+    throttle, robots = F._HostThrottle(0), F._RobotsCache()
+    with patch.object(F.requests, "get", return_value=_Response()) as get:
+        result = F._fetch_one(_entry(), "download", throttle, robots)
+    assert get.call_count == 0, "a file that cannot be moved aside is not refetched over"
+    assert not result.ok
+    assert "could not move" in result.error
+    assert target.read_bytes().startswith(b"<title>"), "the evidence stays where it was"
+
+
 def test_a_reused_file_is_fingerprinted_in_chunks_not_read_whole(workspace):
     """The reuse path held a whole raster in memory to hash it while the download
     beside it streamed. `sha256_of` reads CHUNK_BYTES at a time; the digest has

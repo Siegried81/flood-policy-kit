@@ -25,13 +25,15 @@ shapely>=2.2.0
 # logged as CodeIntegrity 3077/3089/3118, with no pin that fixed it - and by
 # 2026-10-08 around 11:00 it allowed the same wheel again with nothing
 # reinstalled. Measured 2026-10-12: it blocks `import rasterio` again, and the
-# WHOLE suite runs in WSL2, <!-- numbers:tests_collected -->703<!-- /numbers --> passed
+# WHOLE suite runs in WSL2, <!-- numbers:tests_collected -->751<!-- /numbers --> passed
 # and nothing deselected (the count is written by scripts/docs_numbers.py).
 #
-# Keep the WSL2 venv (`~/venvs/flood-test` on Ubuntu) anyway: it is the only
+# Keep the WSL2 venv (`~/venvs/flood-policy-kit` on Ubuntu) anyway: it is the only
 # route that does not depend on the policy's mood, it is where a continental
 # raster build belongs, and the five raster test modules are exactly what disappears
-# when the policy flips. The pins below still matter for the Windows venv.
+# when the policy flips. The pins below still matter for the Windows venv. It is
+# a uv venv with no pip of its own:
+# `uv pip install --python ~/venvs/flood-policy-kit/bin/python -r requirements.txt`.
 #
 # pyproj is pinned EXPLICITLY although geopandas pulls it in transitively,
 # because its failure is the silent one: geopandas still imports, loses all CRS
@@ -59,6 +61,7 @@ matplotlib>=3.11.2
 # LLM layer
 tiktoken>=0.14.0
 requests>=2.34.2
+anthropic>=1.15.0      # Claude, asked first when ANTHROPIC_API_KEY is set
 pyyaml>=6.0.3
 python-dotenv>=1.2.4    # reads .env, so an unset key means "unavailable" and not "unread"
 

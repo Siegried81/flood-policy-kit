@@ -96,8 +96,15 @@ PARTS = ROOT / "data" / "processed" / "exposure_parts"
 
 
 def _part_path(return_period: int, *, mode: str, min_depth_m: float, masks: list[str]) -> Path:
-    """Where one finished return period is parked. Named by what it measures."""
-    tag = f"rp{return_period}_{mode}_d{min_depth_m}_m{len(masks)}"
+    """Where one finished return period is parked. Named by what it measures.
+
+    One mask alone names WHICH one, because keeping the permanent water and
+    keeping the spurious areas are two measurements with the same mask count.
+    Both masks and none keep the bare count, the names the parts on disk were
+    built under, so a rerun still finds them.
+    """
+    masks_tag = f"m{len(masks)}" if len(masks) != 1 else f"m1-{Path(masks[0]).stem}"
+    tag = f"rp{return_period}_{mode}_d{min_depth_m}_{masks_tag}"
     return PARTS / f"{tag}.parquet"
 
 #: `Europe_RP100_filled_depth.tif` -> 100. The directory also holds the two

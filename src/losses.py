@@ -325,8 +325,8 @@ def level_coverage(
     The breakdown behind `parent_coverage_ratio`, one row per parent unit, worst
     coverage first. Country has no parent and is refused.
 
-    How coverage is measured: for each unit at `PARENT_LEVEL[level]`, the total at
-    that unit divided by the summed total of its children at `level`, over the
+    How coverage is measured: for each unit at `PARENT_LEVEL[level]`, the summed
+    total of its children at `level` divided by the total at that unit, over the
     same selection. The denominator is the parent, so 1.0 means fully attributed,
     below 1.0 means losses the finer level does not place, and above 1.0 means the
     children add up to more than the parent reports - all three occur in the real

@@ -107,3 +107,19 @@ def test_a_layer_without_the_gisco_columns_fails_loudly(tmp_path) -> None:
 
     with pytest.raises(SystemExit, match="NAME_LATN"):
         build(path)
+
+
+def test_a_relative_out_path_does_not_crash_after_writing(tmp_path, monkeypatch, capsys) -> None:
+    """`--out` is usually typed relative to the working directory, and
+    `relative_to(ROOT)` raises on it - after the file is written, so the run
+    exited 1 and never printed its summary."""
+    from scripts import build_geometry
+
+    source = _gisco_like(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "sys.argv", ["build_geometry.py", "--source", str(source), "--out", "regions.geojson"]
+    )
+    assert build_geometry.main() == 0
+    assert (tmp_path / "regions.geojson").exists()
+    assert "regions.geojson: 3 regions" in capsys.readouterr().out

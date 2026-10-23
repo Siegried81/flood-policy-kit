@@ -137,6 +137,20 @@ def test_an_empty_retrieval_costs_no_model_call(graph):
     assert state["refused"] is True
 
 
+
+def test_a_weak_draft_costs_one_call_and_reaches_the_human_flagged(graph):
+    """One structured call per run, never a loop: a draft that fails the offline
+    check is not sent back to the model (the redraft resent the same prompt, so
+    it was a re-roll, not a correction). It goes to the gate with its score and
+    its invalid citations, and the human decides."""
+    recorder, run, _, _ = graph([PASSAGE], answer="Something unrelated entirely [S7].")
+    state = run()
+    assert len(recorder.prompts) == 1
+    gate = state["__interrupt__"][0].value
+    assert gate["grounding"] < workflow.MIN_GROUNDING
+    assert gate["issues"] == [7]
+
+
 def test_the_state_the_human_sees_says_refused_and_not_drafted(graph):
     """A refusal that looks like a draft is worse than no refusal at all: the
     human would read "grounding 0.0" as a weak answer rather than as no answer."""
@@ -152,15 +166,16 @@ def test_the_state_the_human_sees_says_refused_and_not_drafted(graph):
 
 
 def test_the_refusal_path_is_shorter_than_the_drafted_one(graph):
-    """RECURSION_LIMIT = 8 was derived from the longest path. The refusal branch
-    does not lengthen it: retrieve -> refuse -> approve is 3 supersteps against
-    the 6 of retrieve -> draft -> verify -> draft -> verify -> approve."""
+    """RECURSION_LIMIT = 8 covers the longest path with room to spare. The refusal
+    branch does not lengthen it: retrieve -> refuse -> approve is 3 supersteps,
+    and with no redraft even a weak draft is retrieve -> draft -> verify ->
+    approve, 4."""
     _, _, _, refused_nodes = graph([])
     assert refused_nodes() == ["retrieve", "refuse"]  # then the gate interrupts
 
     _, _, _, weak_nodes = graph([PASSAGE], answer="Unsupported claim [S9].")
-    assert weak_nodes() == ["retrieve", "draft", "verify", "draft", "verify"]
-    assert workflow.RECURSION_LIMIT >= 6
+    assert weak_nodes() == ["retrieve", "draft", "verify"]
+    assert workflow.RECURSION_LIMIT >= 4
 
 
 def test_the_draft_prompt_fences_the_passages(graph):

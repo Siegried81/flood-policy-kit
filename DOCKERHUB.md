@@ -19,16 +19,16 @@ Flood-risk policy toolkit for the European AI Challenge 2026 (JRC x FARI): a Str
 
 Images from this repository:
 
-- `flood-policy-kit`: code only (~2 GB); the 3.8 GB data tree is bind-mounted
+- `flood-policy-kit`: code only (~2 GB); the 6.4 GiB data tree is bind-mounted
 
 ## How to use this image
 
 ```bash
-docker run -d -p 8501:8501 -v "$PWD/data:/app/data" siegried/flood-policy-kit
+docker run -d -p 127.0.0.1:8501:8501 -v "$PWD/data:/app/data" siegried/flood-policy-kit
 # open http://localhost:8501
 
 # JSON API instead of Streamlit
-docker run -d -p 8010:8010 -v "$PWD/data:/app/data" siegried/flood-policy-kit \
+docker run -d -p 127.0.0.1:8010:8010 -v "$PWD/data:/app/data" siegried/flood-policy-kit \
   python -m uvicorn api.main:app --host 0.0.0.0 --port 8010
 ```
 
@@ -39,9 +39,11 @@ them at run time with `-e NAME=value` or `--env-file .env` (see `.env.example` i
 
 | Variable | Purpose |
 |---|---|
+| `ANTHROPIC_API_KEY` | LLM provider asked first (optional; `ANTHROPIC_MODEL` picks the model, Opus by default) |
 | `GROQ_API_KEY` | LLM provider (optional: Ollama works offline) |
 | `OLLAMA_URL` | Ollama server, e.g. `http://host.docker.internal:11434` |
 | `RDH_BEARER_TOKEN` | Risk Data Hub token; expires after 10 h, so always pass it at run time |
+| `FLOOD_APPROVE_TOKEN` | Shared secret `POST /api/approve` requires as `X-Approve-Token`; unset, approval relies on the loopback-only publish above |
 
 ## Volumes
 
@@ -49,6 +51,6 @@ them at run time with `-e NAME=value` or `--env-file .env` (see `.env.example` i
 
 ## License
 
-See the LICENSE file in the source repository, if any. As with every image, it is
+MIT, see the LICENSE file in the source repository. As with every image, it is
 your responsibility to check that your use complies with the licenses of the
 software it contains.

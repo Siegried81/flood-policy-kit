@@ -157,8 +157,9 @@ def test_every_region_comes_back_once_and_in_order():
 # --- the ensemble ---------------------------------------------------------------
 
 def _member_name(variable="rdisreturnmax50", model="E-HYPEgrid-EUR-11",
-                 gcm="ICHEC-EC-EARTH", member="r12i1p1", period="2041-2070"):
-    return (f"{variable}_tmean_rel_{model}_{gcm}_rcp85_{member}_"
+                 gcm="ICHEC-EC-EARTH", member="r12i1p1", period="2041-2070",
+                 experiment="rcp85"):
+    return (f"{variable}_tmean_rel_{model}_{gcm}_{experiment}_{member}_"
             f"CLMcom-CCLM4-8-17-v1_{period}_1971-2000_grid5km_v1.nc")
 
 
@@ -174,6 +175,18 @@ def test_members_must_answer_the_same_question():
         climate.ensemble_change_by_region(
             _one_region(),
             [_member_name(period="2041-2070"), _member_name(period="2071-2100")],
+        )
+
+
+def test_members_must_share_one_emissions_scenario():
+    """RCP4.5 and RCP8.5 are two futures, not two opinions on one. A file of
+    the other scenario left in the directory would otherwise be blended into
+    the median without a word."""
+    with pytest.raises(ValueError, match="disagree on `experiment`"):
+        climate.ensemble_change_by_region(
+            _one_region(),
+            [_member_name(experiment="rcp85"),
+             _member_name(experiment="rcp45", model="VIC-WUR-EUR-11")],
         )
 
 

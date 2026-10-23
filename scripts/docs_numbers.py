@@ -114,7 +114,7 @@ def rewrite(text, facts):
     so a typo in a marker is loud instead of silently blanked.
 
     A fact that could not be measured here - `nuts3_regions` reads
-    `data/processed/exposure.parquet`, and CI has no `data/` - is neither stale
+    `data/processed/exposure.parquet`, and a checkout can lack it - is neither stale
     nor writable: the block is left as written and not reported. "Cannot check
     on this machine" and "wrong" are different claims, and the first run on the
     runner conflated them: `--check` called the doc's 1,345 stale against

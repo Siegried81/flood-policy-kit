@@ -3,10 +3,11 @@
 One row per region, holding what `exposure.parquet` deliberately does not: the
 built-up surface in the way of the water, the protected Natura 2000 area under
 it, how much of a region drains into a basin it shares with another country, how
-the flood discharge moves under a climate scenario, and the Eurostat
+the flood discharge moves under a climate scenario, how much of it lies in the
+member state's own areas of potential significant flood risk, and the Eurostat
 denominators that qualify a region without describing its residents'
 vulnerability (GDP, population density, household income). `src/assets.py`,
-`src/environment.py`, `src/basins.py`, `src/climate.py` and
+`src/environment.py`, `src/basins.py`, `src/climate.py`, `src/apsfr.py` and
 `src/demographics.py` compute these; this script is what turns them into
 something both UIs and the brief can read.
 
@@ -173,7 +174,7 @@ def _climate(admin: gpd.GeoDataFrame, variable: str, period: str):
     if not members:
         return None, (
             f"no {variable} file for {period} in "
-            f"{CLIMATE_DIR.relative_to(ROOT)} - fetch it from the CDS form"
+            f"{CLIMATE_DIR.relative_to(ROOT)} - fetch it with scripts/fetch_cds_member.py or the CDS form"
         )
     frame = climate.ensemble_change_by_region(admin, members)
     frame.columns = [f"{c}_{period.replace('-', '_')}" for c in frame.columns]

@@ -137,10 +137,10 @@ Windows host. The `pyogrio`/`pyproj` caps in `requirements.txt` bought back thre
 of them. Windows Smart App Control then moved to enforcement on 2026-10-07 and
 refused `rasterio`'s own GDAL build, which no pin fixed; by 2026-10-08 it allowed
 the same wheel again with nothing reinstalled. **The policy moves both ways, so
-measure rather than believe either state** — measured 2026-10-14, it blocks
-`import rasterio` again, so the five raster test modules (59 tests) do not
-collect on Windows, while the WSL2 venv collects the whole suite:
-**<!-- numbers:tests_collected -->703<!-- /numbers --> collected, nothing deselected, all passing** (the
+measure rather than believe either state** — measured 2026-10-14 it blocked
+`import rasterio` again; measured 2026-10-23 it allows it, and the Windows venv
+collects the whole suite, as the WSL2 venv does:
+**<!-- numbers:tests_collected -->751<!-- /numbers --> collected, nothing deselected, all passing** (the
 climate dry-run test that used to read the CDS files already in `data/` now
 honours its patched directory). The WSL2 venv stays, because it is the only route that does
 not depend on the policy's mood and it is where a continental raster build
@@ -199,19 +199,24 @@ never published; build it locally.
 
 ## Quick start
 
+Written for Linux/WSL2 (`.venv/bin/`). On the Windows venv, read
+`.venv\Scripts\python.exe` for `.venv/bin/python`, and `.venv\Scripts\streamlit.exe`
+and `.venv\Scripts\uvicorn.exe` for the two UIs; the ambient `python` has
+neither pytest nor rasterio.
+
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m pytest -q           # <!-- numbers:tests_collected -->703<!-- /numbers --> tests, offline: no network, no model
-                                        # Collected 2026-10-14 in WSL2, nothing
-                                        # deselected, all passing. Smart App Control blocks
+.venv/bin/python -m pytest -q           # <!-- numbers:tests_collected -->751<!-- /numbers --> tests, offline: no network, no model
+                                        # All collected and passing 2026-10-23 on
+                                        # Windows. Smart App Control blocks
                                         # rasterio on Windows some days and not
-                                        # others (blocked again 2026-10-14), so re-measure
+                                        # others (blocked 2026-10-14), so re-measure
                                         # rather than trust this number — see
                                         # requirements.txt for the whole story.
                                         #   wsl -d Ubuntu
-                                        #   ~/venvs/flood-test/bin/python -m pytest -q
+                                        #   ~/venvs/flood-policy-kit/bin/python -m pytest -q
 .venv/bin/python -m src.fetch           # 38 geodata downloads + 24 policy_corpus
-                                        # + 3 context = 65 files, ≈5.09 GiB
+                                        # + 3 context = 65 files, ≈5.56 GiB
                                         # (before 25 Oct, once)
 .venv/bin/python scripts/build_exposure.py --stripes 72 # -> data/processed/exposure.parquet
 .venv/bin/python scripts/build_context.py  --stripes 72 # -> data/processed/context.parquet
@@ -292,8 +297,8 @@ unplugged. Streamlit is the fallback that needs no `npm`.
 
 Data is **not** committed (`data/` is ignored): run `.venv/bin/python -m src.fetch` to
 download what `config/sources.yaml` declares — **30 `geodata` entries that expand
-to 52 jobs, of which 38 are downloadable files at ≈5.05 GiB** (the other fourteen are
-`access: api`, queried at runtime and never stored), or **65 files and ≈5.09 GiB**
+to 52 jobs, of which 38 are downloadable files at ≈5.52 GiB** (the other fourteen are
+`access: api`, queried at runtime and never stored), or **65 files and ≈5.56 GiB**
 once the `policy_corpus` (24 entries) and `context` (3) sections are included —
 every one of those twenty-seven a `scrape`. Of the geodata, the nine return periods are
 2.61 GiB. Do this **before 25 October** — the Wi-Fi of a 60-person hackathon will
@@ -317,10 +322,11 @@ Three sources sit outside `python -m src.fetch`, and each for its own reason:
   over 8 pages and answers HTTP 500 to a page it dislikes. `src/basins.py`
   caches it to `data/processed/basins_cache/` — 288 MiB, fetch it once before
   the event.
-- **Copernicus CDS hydrology projections** are fetched by hand through the CDS
-  download form, because that form is where a request's cost is checked against
-  its 1000 cap. Drop the `.nc` files in
-  `data/raw/download/cds_hydrology_projections/`.
+- **Copernicus CDS hydrology projections** are fetched by
+  `scripts/fetch_cds_member.py` (one member per request, under the form's 1000
+  cap, `--all-missing` for the rest of the ensemble; `CDSAPI_KEY` or
+  `~/.cdsapirc`), or by hand through the CDS form. Either way the `.nc` files
+  land in `data/raw/download/cds_hydrology_projections/`.
 
 `scripts/check_offline_readiness.py` skips `access: api` entries, so none of the
 three appears in its per-file table — but all three have a check of their own:
@@ -329,6 +335,19 @@ figure), the basins cache and the CDS folder are **WARN** when absent (the map
 and the brief run without them; the shared-basin and climate layers simply say
 so). The verdict has three states — `READY`, `READY WITH CAVEATS`, `BLOCKED` —
 and `--strict` turns every caveat into a block, which is the mode to run the
-evening before: a `GROQ_API_KEY` left in `.env` is a caveat on any other day and
+evening before: an `ANTHROPIC_API_KEY` or `GROQ_API_KEY` left in `.env` is a caveat on any other day and
 the thing that routes the demo through the venue Wi-Fi on that one. See
 [`docs/datasets.md`](docs/datasets.md).
+
+## Licence and data credits
+
+The code is MIT ([`LICENSE`](LICENSE)). The data is not: the two frozen tables
+committed under `data/processed/` keep their sources' licences, listed with the
+exact credit each requires in
+[`data/processed/DATA_NOTICE.md`](data/processed/DATA_NOTICE.md). In short:
+© EuroGeographics for the administrative boundaries (Eurostat/GISCO, NUTS 2024,
+non-commercial use); flood hazard and population/built-up © European Union, JRC
+(CC BY 4.0); Natura 2000 and river basin districts © European Environment Agency
+(CC BY 4.0); contains modified Copernicus Climate Change Service information 2026;
+indicators: Source: Eurostat. The region polygons themselves are not committed,
+because the GISCO terms do not let this repository pass them on.

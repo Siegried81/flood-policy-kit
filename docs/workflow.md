@@ -17,13 +17,12 @@ deliverable should not have.
 So `src/workflow.py` is a fixed graph:
 
 ```
-retrieve ──► draft ──► verify ──┬──► approve ──► END
-   │           ▲                │       ▲
-   │           └────────────────┘       │   (bounded redraft)
-   └──► refuse ─────────────────────────┘   (nothing retrieved: the human still sees it)
+retrieve ──► draft ──► verify ──► approve ──► END
+   │                                 ▲   (a weak draft arrives flagged)
+   └──► refuse ──────────────────────┘   (nothing retrieved: the human still sees it)
 ```
 
-One LLM call per node. No tool loop. The graph cannot take an action nobody
+One LLM call per run, at most. No tool loop, no redraft loop. The graph cannot take an action nobody
 designed, and that sentence is worth more to a jury than any capability claim.
 
 ## Trigger → Process → Action
@@ -44,13 +43,15 @@ one behind the gate. That is the whole design in one line.
 | Guard | Value | Prevents |
 |---|---|---|
 | `RECURSION_LIMIT` | 8 | A confused graph cycling until the API budget is gone |
-| `MAX_REDRAFTS` | 2 | A model that cannot ground its draft looping on the same failure |
+| `MAX_REDRAFTS` | 0 | A second paid call: a weak draft is not re-rolled, it is flagged |
 | `MIN_GROUNDING` | 0.7 | A plausible but unsupported paragraph reaching the brief |
 | `interrupt()` | — | Anything at all reaching the brief without a human reading it |
 
-The redraft limit matters more than it looks: past the limit the **flagged** draft
-still goes to the human. A person reading a draft marked "weakly grounded" is a
-better outcome than a workflow that never finishes.
+The redraft limit is 0 on purpose: a redraft resent the same prompt, so it was a
+re-roll rather than a correction, and it doubled the cost of the drafts that
+needed the most scrutiny. A weak draft goes to the human with its grounding
+score and its invalid citations. A person reading a draft marked "weakly
+grounded" is a better outcome than a model asked to try again blind.
 
 ## Human-in-the-loop: which pattern, and why
 
@@ -59,8 +60,9 @@ The course lists four HITL patterns. This pipeline uses two, deliberately:
 - **Approval gate** — the graph pauses at `approve` until a person resumes it.
   This is HLEG requirement 1 (human agency and oversight) made executable instead
   of asserted.
-- **Confidence threshold** — below `MIN_GROUNDING`, redraft rather than pass.
-  Automate when the result is strong; escalate when it is not.
+- **Confidence threshold** — below `MIN_GROUNDING`, the draft is flagged at the
+  gate rather than passed silently. Automate when the result is strong;
+  escalate to the human when it is not.
 
 One detail worth defending out loud: when the human edits rather than approves,
 the edit is used **as-is**. It is not fed back to the model to rewrite, because
@@ -84,7 +86,7 @@ source permanently done. A silent success, repeated on every later run, with no
 data in it. `expand()` is the fix: an entry's `files:` list becomes one job per
 file, ids become `<entry id>/<file stem>`, and the count `fetch_all` prints is
 the number of jobs (52 for `geodata`, of which 38 are files to download at
-≈5.05 GiB and 14 are runtime API calls; 79 jobs and 65 files at ≈5.09 GiB across
+≈5.52 GiB and 14 are runtime API calls; 79 jobs and 65 files at ≈5.56 GiB across
 all three sections, derived from `sources.yaml` on 12 October 2026) rather than of
 declared entries, of which there are 57. Entries with no `files:` key pass through untouched, so every
 single-file source keeps its previous on-disk path.
@@ -107,17 +109,21 @@ means it is already tested and you can explain it from memory.
 
 ## Running it
 
-```bash
-.venv/bin/pip install langgraph langchain-core
-```
+`langgraph` and `langchain-core` are already in `requirements.txt`.
 
 ```python
-from src.workflow import run
+from langgraph.types import Command
+from src.workflow import RECURSION_LIMIT, build_graph
 from src.toon_io import to_toon
 
-state = run("Which communes should be prioritised for a warning system?",
-            to_toon(frozen_exposure_table, "exposure"))
+app = build_graph()               # keep it: its checkpointer holds the paused run
+config = {"configurable": {"thread_id": "brief-1"}, "recursion_limit": RECURSION_LIMIT}
+state = app.invoke({"question": "Which communes should be prioritised for a warning system?",
+                    "exposure_toon": to_toon(frozen_exposure_table, "exposure")}, config)
 print(state["__interrupt__"])     # the draft awaiting your decision
+app.invoke(Command(resume="approve"), config)   # or resume with your edited text
 ```
 
-Resume with `Command(resume="approve")`, or with your edited text.
+`run()` is the one-shot form of the first two calls. It builds its own graph
+and returns only the payload, so it cannot be resumed: use it to look at a
+draft, and `build_graph()` to approve one.
