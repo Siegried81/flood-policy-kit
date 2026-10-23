@@ -173,6 +173,23 @@ def international_basins(path: Path | str = CROSSWALK) -> dict[str, str]:
     return out
 
 
+def basin_names(path: Path | str = CROSSWALK) -> dict[str, str]:
+    """International basin id -> the name a reader knows it by ("Danube").
+
+    Read from the same declared file as the grouping, so a basin's name cannot
+    disagree with the districts it groups. Empty when the file is missing: a
+    name is a label, and its absence must not stop the shares being computed.
+    """
+    path = Path(path)
+    if not path.exists():
+        return {}
+    declared = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    return {
+        basin_id: body.get("name") or basin_id
+        for basin_id, body in (declared.get("basins") or {}).items()
+    }
+
+
 def check_crosswalk(
     districts: gpd.GeoDataFrame, path: Path | str = CROSSWALK
 ) -> pd.DataFrame:
@@ -485,6 +502,27 @@ def basin_countries(
     return out
 
 
+def _shared_basin_names(pieces: gpd.GeoDataFrame, labels: dict) -> pd.Series:
+    """Per region, the names of its SHARED basins, largest share of it first.
+
+    Restricted to `is_shared` for the reason `_others` gives: these names stand
+    beside `shared_with`, and a basin listed there must be one the countries
+    were counted on. Ordered by area so the first name is the basin that
+    matters most to the region, not the alphabetically first. `labels` maps a
+    basin id to its name; an id it lacks is shown as is rather than dropped.
+    """
+    shared = pieces[pieces["is_shared"]]
+    if shared.empty:
+        return pd.Series(dtype="object")
+    names = labels
+    area = shared.groupby(["_region", "basin_id"])["piece_area_m2"].sum()
+    ordered = area.reset_index().sort_values(
+        ["_region", "piece_area_m2"], ascending=[True, False]
+    )
+    ordered["name"] = ordered["basin_id"].map(lambda b: names.get(b, str(b)))
+    return ordered.groupby("_region")["name"].apply(list)
+
+
 def shared_basin_exposure(
     admin: gpd.GeoDataFrame,
     basins: gpd.GeoDataFrame,
@@ -492,7 +530,7 @@ def shared_basin_exposure(
 ) -> pd.DataFrame:
     """Per region: how much of it drains into a basin it shares with others.
 
-    Four columns:
+    Five columns:
 
     - `shared_basin_share` - the share of the region's area, in [0, 1], lying in
       a district that also covers another country. The figure to rank on: a
@@ -501,6 +539,9 @@ def shared_basin_exposure(
       only. What turns the number into a sentence a decision-maker can act on -
       which is why it is read off the same basins as `shared_basin_share`: a
       partner listed beside a share of 0.0 states the opposite of the share.
+    - `shared_basins` - the names of those same shared basins, the one holding
+      most of the region first. "Shared with SK" says who to call; "Danube" says
+      about what, and is the word the policy text uses.
     - `basin_countries_max` - the most countries any single one of the region's
       basins spans. A region in one basin shared with five countries is a harder
       coordination problem than one in five bilateral basins.
@@ -546,6 +587,7 @@ def shared_basin_exposure(
             "basin_area_share": pd.Series(float("nan"), index=admin.index),
             "basin_countries_max": pd.Series(0, index=admin.index, dtype="int64"),
             "shared_with": pd.Series([[] for _ in admin.index], index=admin.index),
+            "shared_basins": pd.Series([[] for _ in admin.index], index=admin.index),
         }
     )
     # An overlay with nothing in it is a real case - a frame of coastal regions
@@ -608,10 +650,22 @@ def shared_basin_exposure(
             .reindex(admin.index),
         }
     )
+    # A basin the crosswalk does not group is one district, and is labelled by
+    # the district's own code - never by its row number, which means nothing.
+    labels = {
+        **dict(zip(countries["basin_id"], basins.get(CODE_COLUMN, countries["basin_id"]))),
+        **basin_names(),
+    }
+    out["shared_basins"] = _shared_basin_names(pieces, labels).reindex(admin.index)
+    # The union of a region's pieces cannot exceed the region, but its area is
+    # computed from different vertices than the region's own and lands a few
+    # 1e-15 above it: measured on the real layer, 153 regions read
+    # 1.0000000000000022 for a figure documented as a share in [0, 1].
+    for column in ("shared_basin_share", "basin_area_share"):
+        out[column] = out[column].clip(upper=1.0)
     out["basin_countries_max"] = out["basin_countries_max"].fillna(0).astype("int64")
-    out["shared_with"] = out["shared_with"].apply(
-        lambda v: v if isinstance(v, list) else []
-    )
+    for column in ("shared_with", "shared_basins"):
+        out[column] = out[column].apply(lambda v: v if isinstance(v, list) else [])
     # A region no district covers has no share to report. 0.0 would read as
     # "drains nowhere shared", which is a finding; this is an absence.
     uncovered = out["basin_area_share"] <= 0

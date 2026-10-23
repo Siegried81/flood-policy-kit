@@ -756,3 +756,23 @@ def test_every_corpus_document_lands_in_a_format_the_retrieval_layer_reads():
     for entry in _declared("policy_corpus").values():
         for job in F.expand(entry):
             assert F.target_of(job, "scrape").suffix in readable, job["id"]
+
+
+def test_fetch_source_runs_one_declared_entry_through_the_same_checks(monkeypatch):
+    """The hosted app fetches the map boundaries alone. It must go through
+    `_fetch_one` - quarantine, body checks, robots - with the entry exactly as
+    declared, and must not rewrite the manifest of a full run."""
+    seen = []
+    monkeypatch.setattr(F, "_fetch_one", lambda entry, kind, *a: seen.append((entry, kind)) or "r")
+    monkeypatch.setattr(F, "fetch_all", lambda *a, **k: pytest.fail("fetched everything"))
+
+    assert F.fetch_source("gisco_nuts3") == "r"
+    (entry, kind), = seen
+    assert entry["id"] == "gisco_nuts3" and kind == "download"
+    assert entry["url"].endswith("NUTS_RG_01M_2024_3035_LEVL_3.geojson")
+
+
+def test_fetch_source_refuses_an_undeclared_id():
+    """Only `config/sources.yaml` decides what gets fetched."""
+    with pytest.raises(KeyError, match="not declared"):
+        F.fetch_source("not_a_source")

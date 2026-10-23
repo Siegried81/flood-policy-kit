@@ -123,3 +123,56 @@ def test_a_relative_out_path_does_not_crash_after_writing(tmp_path, monkeypatch,
     assert build_geometry.main() == 0
     assert (tmp_path / "regions.geojson").exists()
     assert "regions.geojson: 3 regions" in capsys.readouterr().out
+
+
+def test_ensure_never_touches_the_network_when_the_file_exists(tmp_path, monkeypatch) -> None:
+    """The venue demo runs with the Wi-Fi off. A machine that already built the
+    geometry must not try GISCO at all, or every page load waits on a timeout."""
+    from scripts import build_geometry
+    from src import fetch
+
+    out = tmp_path / "regions.geojson"
+    out.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(fetch, "fetch_source", lambda *a, **k: pytest.fail("fetched"))
+    assert build_geometry.ensure(out, tmp_path / "absent.geojson") is None
+
+
+def test_ensure_reports_a_failed_download_and_writes_nothing(tmp_path, monkeypatch) -> None:
+    """The hosted app shows this text on the page, so it must say what failed,
+    and a failure must not leave a file that a later run would trust."""
+    from scripts import build_geometry
+    from src import fetch
+
+    failed = fetch.FetchResult(
+        "gisco_nuts3", "https://example.invalid", None, None, 0, None, "now",
+        error="ConnectionError: offline",
+    )
+    monkeypatch.setattr(fetch, "fetch_source", lambda *a, **k: failed)
+    out = tmp_path / "regions.geojson"
+    reason = build_geometry.ensure(out, tmp_path / "absent.geojson")
+    assert "GISCO" in reason and "offline" in reason
+    assert not out.exists()
+
+
+def test_ensure_builds_the_join_keyed_file_once_the_source_is_there(tmp_path, monkeypatch) -> None:
+    """The success path the hosted app relies on: download, then the same build
+    the CLI runs, keyed on `nuts_id`, written whole."""
+    import json
+
+    from scripts import build_geometry
+    from src import fetch
+
+    source = tmp_path / "gisco_nuts3.geojson"
+    fixture = _gisco_like(tmp_path)
+
+    def download(source_id, *a, **k):
+        assert source_id == "gisco_nuts3"
+        source.write_bytes(fixture.read_bytes())
+        return fetch.FetchResult(source_id, "u", str(source), 200, 1, "h", "now", error=None)
+
+    monkeypatch.setattr(fetch, "fetch_source", download)
+    out = tmp_path / "processed" / "regions.geojson"
+    assert build_geometry.ensure(out, source) is None
+    features = json.loads(out.read_text(encoding="utf-8"))["features"]
+    assert [f["properties"]["nuts_id"] for f in features] == ["XX000", "XX001", "XX002"]
+    assert not (out.parent / "regions.geojson.part").exists()

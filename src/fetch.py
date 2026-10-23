@@ -696,6 +696,21 @@ def _fetch_one(
     )
 
 
+def fetch_source(source_id: str, section: str = "geodata") -> FetchResult:
+    """Fetch ONE declared source, through the same checks as `fetch_all`.
+
+    For a caller that needs a single small file at runtime - the hosted
+    Streamlit app building its map polygons - and must not pull the other
+    gigabytes `fetch_all` would. It does not rewrite `manifest.json`: that file
+    records a full collection run, and one entry overwriting it would erase the
+    provenance of every other file on disk.
+    """
+    entry = next((e for e in sources(section) or [] if e["id"] == source_id), None)
+    if entry is None:
+        raise KeyError(f"{source_id!r} is not declared under `{section}` in config/sources.yaml")
+    return _fetch_one(entry, entry.get("access", "download"), _HostThrottle(), _RobotsCache())
+
+
 def fetch_all(sections: tuple[str, ...] = ("geodata", "policy_corpus", "context")) -> list[FetchResult]:
     """Fetch every declared source, in parallel, and write the provenance manifest.
 

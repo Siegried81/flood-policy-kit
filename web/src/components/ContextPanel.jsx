@@ -32,9 +32,9 @@ const squareMetres = (value) =>
   value == null ? "" : Math.round(value).toLocaleString();
 
 /**
- * Country codes as a readable list.
+ * Country codes, or basin names, as a readable list.
  *
- * `shared_with` arrives as an array, and JSX renders an array by concatenating
+ * `shared_with` and `shared_basins` arrive as arrays, and JSX renders an array by concatenating
  * its items with nothing between them - so four countries printed as `DEFRLUNL`,
  * which is not a country and not four countries either.
  */
@@ -328,6 +328,8 @@ export default function ContextPanel({ names = new Map() }) {
                 render: (row) => `${(row.shared_basin_share * 100).toFixed(0)}%` },
               { label: "Countries", sort: (row) => row.basin_countries_max,
                 render: (row) => row.basin_countries_max },
+              { label: "Basin", sort: (row) => countries(row.shared_basins),
+                render: (row) => countries(row.shared_basins) },
               { label: "Shared with", sort: (row) => countries(row.shared_with),
                 render: (row) => countries(row.shared_with) },
             ]}

@@ -2077,3 +2077,48 @@ evidence; the threshold should then be revisited, not kept by habit.
   files before the multi-hour rebuild.
 - **What changes in the numbers:** none of the frozen figures. What the model
   is shown for a React draft changes, as above.
+
+## 2026-10-23 — the hosted Streamlit app downloads its map boundaries
+
+- **Without `regions.geojson` the page now tries GISCO before giving up.** A
+  hosted Streamlit app clones the repository, which carries the two frozen
+  tables but not the polygons (the GISCO terms, entry above), so the map was
+  the one section that could never render there. `load_geometry` now calls
+  `scripts/build_geometry.py::ensure`, which fetches `gisco_nuts3` through
+  `src.fetch.fetch_source` - the same checks as a full `python -m src.fetch`,
+  without rewriting the manifest of that run - and builds the file. The copy
+  comes from the publisher, not from the repository. Measured: 1,345 regions,
+  2.8 MB, built in 3.1 s from the 25 MB layer.
+- **The venue demo stays offline.** A machine that already has the file never
+  calls the network; the outcome of an attempt is cached ten minutes, so an
+  offline machine without the file waits on one timeout, not one per rerun,
+  and the warning now says why the download failed.
+- **What changes in the numbers:** nothing. The app gains a network call, only
+  when the geometry is missing.
+
+## 2026-10-23 — shared basins are named, and their shares stop at 1.0
+
+- **`shared_basins`, a new context column: the names of a region's shared
+  basins, the one holding most of it first.** `shared_with` said who to call
+  (`[SK]`); nothing said about what. The names are the `name` of each basin in
+  `config/international_basins.yaml`, read off the same shared basins as
+  `shared_with`, so the two lists always describe the same water. PL923 now
+  reads `[SK]` / `[Vistula]`, BE341 `[Meuse, Rhine]`. 810 regions carry a name,
+  189 more than one. Shown in the Streamlit and React basin tables.
+- **`shared_basin_share` and `basin_area_share` are clipped to 1.0.** Measured
+  on the frozen table: 153 and 290 regions read up to 1.0000000000000022 and
+  1.0000000000000056, for figures documented as shares in [0, 1] - float noise
+  between the area of a region and of the union of its pieces, visible as-is
+  in the Streamlit table. Largest change 1.2e-13; no ranking moves.
+- **Not changed, and worth knowing:** `shared_with` takes the partners of every
+  shared basin a region touches, however little of it. Measured: 54 of 1,016
+  region-basin pairs cover under 0.1% of the region (PL623 touches the Nemunas
+  over 16 m2), and a 50 km2 floor would change `shared_with` for 45 of 810
+  regions - but it would also drop real minor basins of small regions (BE310,
+  14 km2 of the Meuse). `shared_basins` lists the same basins, so a sliver
+  shows up there by name and can be spotted. Where to draw the line is a
+  measurement decision left open.
+- **How the table was updated:** only the basin columns of `context.parquet`
+  were recomputed (`src.basins.shared_basin_exposure` on the cached WFD layer,
+  99 s) and written back; every other column is byte-for-byte the 2026-10-12
+  build. The previous file is kept as `context.parquet.backup-20261023`.
