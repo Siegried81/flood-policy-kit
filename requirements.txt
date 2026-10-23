@@ -51,7 +51,7 @@ pandas>=3.0.6
 numpy>=2.5.4
 
 # App + maps
-streamlit>=1.65.0
+streamlit>=1.66.0
 folium>=0.20.0
 streamlit-folium>=0.27.4
 matplotlib>=3.11.2
@@ -66,14 +66,14 @@ python-dotenv>=1.2.4    # reads .env, so an unset key means "unavailable" and no
 pytest>=9.1.1
 
 # API for the React UI
-fastapi>=0.143.0
+fastapi>=0.146.0
 uvicorn>=0.54.0
-pypdf>=6.20.0          # the policy corpus includes PDFs
+pypdf>=6.21.1          # the policy corpus includes PDFs
 pyarrow>=26.0.0       # parquet round-trips dtypes exactly; CSV loses a NUTS code's leading zero
 
 # Workflow + optional tracing
-langgraph>=1.2.14
-langchain-core>=1.6.9
+langgraph>=1.2.16
+langchain-core>=1.6.12
 
 # Agent access: intent-based MCP tools (api/mcp_server.py). Pure Python.
 mcp>=2.3.0
