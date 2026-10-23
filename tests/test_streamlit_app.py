@@ -26,8 +26,12 @@ import pytest
 import streamlit as st
 from streamlit.testing.v1 import AppTest
 
+from scripts import build_geometry
 from src import rag, svgmap, usage_log
 from tests.test_api import _context_table, _nested_table
+
+#: What the patched download answers, so a test can check the page relays it.
+OFFLINE = "could not download the GISCO boundaries: offline in this test"
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 APP = ROOT / "app" / "streamlit_app.py"
@@ -135,12 +139,18 @@ def _frozen(
     # load_exposure and load_context are both @st.cache_data with no arguments,
     # so their keys are constant across runs: without this the second test in a
     # session reads the first test's tables.
+    # The app downloads the boundaries when the geometry is absent. Patched to a
+    # failure so no test reaches GISCO, and so "absent" stays absent instead of
+    # writing a real regions.geojson into data/processed/. cache_resource holds
+    # that outcome for ten minutes, so it is cleared like cache_data.
     st.cache_data.clear()
+    st.cache_resource.clear()
     with (
         patch.object(pathlib.Path, "exists", exists),
         patch.object(pathlib.Path, "stat", stat),
         patch.object(pd, "read_parquet", read_parquet),
         patch.object(svgmap, "load_features", load_features),
+        patch.object(build_geometry, "ensure", lambda *a, **k: OFFLINE),
     ):
         yield
 
@@ -352,6 +362,8 @@ def test_the_map_says_how_to_build_geometry_it_does_not_have():
     said = _texts(app_test)
     assert app_test.exception == []
     assert "scripts/build_geometry.py" in said
+    # The download was tried and why it failed is on the page, not swallowed.
+    assert "offline in this test" in said
     # And the ranking still works without it.
     assert "Ranked: exposed population" in said
 

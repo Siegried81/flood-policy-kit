@@ -30,7 +30,9 @@ Three choices here are load-bearing:
 The output is a derived file and, unlike `exposure.parquet`, it is not
 committed: it is a copy of the GISCO geometry, whose terms do not let a public
 repository pass it on (`data/processed/DATA_NOTICE.md`). So this runs after
-`python -m src.fetch` and before the first demo, on every machine.
+`python -m src.fetch` and before the first demo, on every machine. A machine
+that skipped both - the hosted Streamlit app - gets it from `ensure`, which
+downloads the GISCO layer from GISCO and builds the file on first use.
 """
 
 from __future__ import annotations
@@ -116,6 +118,49 @@ def build(
     return {"type": "FeatureCollection", "features": features}
 
 
+def write(collection: dict, out: Path = OUT) -> None:
+    """Write the collection compactly, replacing `out` only once it is complete.
+
+    separators: the default json dump pads every comma, which on ~1,345 polygons
+    is megabytes of spaces the browser downloads. The temporary file matters for
+    `ensure`: a page that reads `out` while it is being written would otherwise
+    parse half a FeatureCollection.
+    """
+    out.parent.mkdir(parents=True, exist_ok=True)
+    partial = out.with_name(out.name + ".part")
+    partial.write_text(json.dumps(collection, separators=(",", ":")), encoding="utf-8")
+    partial.replace(out)
+
+
+def ensure(out: Path = OUT, source: Path = BOUNDARIES) -> str | None:
+    """Make sure `out` exists, downloading the GISCO layer if it must. None on success.
+
+    The hosted Streamlit app clones the repository, and the repository cannot
+    carry the polygons (module docstring). So the app fetches the boundaries
+    from GISCO itself, the first time a page asks for the map: the copy comes
+    from the publisher, not from this repository. A machine that already built
+    `out` never touches the network, which keeps the venue demo offline.
+
+    Returns the reason as text rather than raising, because the caller is a page
+    that must still render everything that is not the map.
+    """
+    if out.exists():
+        return None
+    if not source.exists():
+        from src.fetch import fetch_source  # requests, only when there is something to fetch
+
+        result = fetch_source("gisco_nuts3")
+        if not result.ok:
+            return f"could not download the GISCO boundaries: {result.error}"
+    try:
+        write(build(source), out)
+    # Broad on purpose: pyogrio, shapely and the column check each raise their
+    # own type, and any of them must leave the page rendering without a map.
+    except (Exception, SystemExit) as exc:
+        return f"could not build {out.name}: {exc}"
+    return None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -143,12 +188,7 @@ def main() -> int:
         )
 
     collection = build(args.source, args.tolerance_m, args.decimals)
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    # separators: the default json dump pads every comma, which on ~1,345
-    # polygons is megabytes of spaces the browser downloads.
-    args.out.write_text(
-        json.dumps(collection, separators=(",", ":")), encoding="utf-8"
-    )
+    write(collection, args.out)
     # relative_to(ROOT) raises on a relative `--out`, after the file is written.
     shown = args.out.relative_to(ROOT) if args.out.is_relative_to(ROOT) else args.out
     print(

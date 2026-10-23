@@ -236,7 +236,9 @@ period server-side and saying so in `defaulted_return_period`.
 
 `scripts/build_geometry.py` simplifies the 1,345 GISCO NUTS3 polygons at
 **1 km** in EPSG:3035, converts to 4326, keeps two properties and rounds
-coordinates to four decimals. 25 MB becomes 2.8 MB.
+coordinates to four decimals. 25 MB becomes 2.8 MB. It is not committed (GISCO
+terms), so a hosted Streamlit app with no `data/raw/` calls `ensure()`, which
+downloads the layer from GISCO and builds the file on first use.
 
 Two choices are load-bearing and both fail silently if got wrong:
 
@@ -344,8 +346,8 @@ down in advance.
 
 ## 7. The test suite
 
-**<!-- numbers:tests_collected -->751<!-- /numbers --> tests, offline**: no network, no model, no key. Measured 12 October 2026 in
-WSL2: all <!-- numbers:tests_collected -->751<!-- /numbers --> collect and pass, nothing deselected; the same day Windows
+**<!-- numbers:tests_collected -->760<!-- /numbers --> tests, offline**: no network, no model, no key. Measured 12 October 2026 in
+WSL2: all <!-- numbers:tests_collected -->760<!-- /numbers --> collect and pass, nothing deselected; the same day Windows
 blocked `rasterio` again. Re-run on 14 October 2026: still blocked on Windows
 (the five raster modules, 59 tests, do not collect), and in WSL2 all 702 pass
 once `test_climate.py`'s dry-run test stopped reading the CDS files already in
@@ -378,10 +380,10 @@ summed to 473, a figure that had survived three suite changes by being typed.
 | `test_validate.py` | 50 | the scoring grid, the three metrics, `None` vs `0.0` |
 | `test_api.py` | 72 | the routes, the 404s that name their builder, the JSX guards, a table frozen before the units rename, the approve token and the bounds on `k` |
 | `test_streamlit_app.py` | 57 | the fallback UI, the translation and ask-the-table tabs, the climate and coverage caveats, the density, income and Natura 2000 sections, a rebuilt table replacing the cached one, a table frozen before the units rename |
-| `test_fetch.py` | 60 | robots, idempotency, multi-file expansion, a stale rejection page is quarantined, colliding paths are refused, the cited policy sources are declared and every corpus file lands in a format the index reads |
+| `test_fetch.py` | 62 | robots, idempotency, a single declared source for the hosted app, multi-file expansion, a stale rejection page is quarantined, colliding paths are refused, the cited policy sources are declared and every corpus file lands in a format the index reads |
 | `test_rag.py` | 67 | cite-or-refuse, and a fence no spelling of the closing tag escapes |
 | `test_losses.py` | 29 | the RDH euro vintages and the levelling |
-| `test_basins.py` | 27 | the shared-basin layer: the declared crosswalk, the sliver floor |
+| `test_basins.py` | 31 | the shared-basin layer: the declared crosswalk, the sliver floor, the basin names, shares that stop at 1.0 |
 | `test_exposure.py` | 25 | the two modes, `nodata_means_dry`, the masks, the build checkpoint |
 | `test_workflow.py` | 24 | the five nodes, the guards, the human gate |
 | `test_climate.py` | 32 | the future layer: provenance, the median, the ensemble and its quartiles, a member per simulation, the fetcher against a mocked CDS |
@@ -400,7 +402,7 @@ summed to 473, a figure that had survived three suite changes by being typed.
 | `test_docs_numbers.py` | 10 | a number typed in a doc that no longer matches the code fails the suite |
 | `test_legislation.py` | 7 | every legal citation has a CELEX and a URL, and `policy_answer.md` cites no article the registry lacks |
 | `test_build_context.py` | 2 | the context build does not fail after writing its table |
-| `test_build_geometry.py` | 6 | the join key, the projection, the simplification |
+| `test_build_geometry.py` | 9 | the join key, the projection, the simplification, the hosted app's download-and-build |
 | `test_data_io.py` | 3 | the CRS engine is alive |
 
 `test_data_io.py` earns its three tests: a dead `pyproj` is the silent failure in
@@ -415,7 +417,7 @@ zonal statistic is the right arithmetic on the wrong piece of Europe. Measured o
 
 | Claim | Source |
 |---|---|
-| <!-- numbers:tests_collected -->751<!-- /numbers --> tests | `scripts/docs_numbers.py --write`, which runs `pytest --collect-only` and rewrites the marked blocks; the per-file counts are typed by hand |
+| <!-- numbers:tests_collected -->760<!-- /numbers --> tests | `scripts/docs_numbers.py --write`, which runs `pytest --collect-only` and rewrites the marked blocks; the per-file counts are typed by hand |
 | 65 files, ≈5.56 GiB | `src.fetch.expand()` over `config/sources.yaml`; the bytes measured on disk on 23 October, all 65 files present |
 | <!-- numbers:sources_declared -->57<!-- /numbers --> declared inputs, <!-- numbers:sources_verified -->49<!-- /numbers --> with a verification date, <!-- numbers:sources_licensed -->20<!-- /numbers --> with an explicit `licence:` | `scripts/docs_numbers.py` over `config/sources.yaml`: entries with an `id`; `verified` not null; `licence` non-empty |
 | 1,345 NUTS3 polygons | the GISCO NUTS 2024 file itself |

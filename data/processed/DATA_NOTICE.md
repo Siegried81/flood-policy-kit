@@ -11,7 +11,8 @@ responsible for these results.
 the GISCO NUTS geometry, whose terms grant a non-transferable right to use and
 process for non-commercial purposes only, which a public MIT repository cannot
 pass on. `python scripts/build_geometry.py` rebuilds it in seconds from the
-boundary file `python -m src.fetch` downloads.
+boundary file `python -m src.fetch` downloads, and a hosted Streamlit app that
+has neither downloads that file from GISCO and builds it on first use.
 
 ## Sources and required credits
 

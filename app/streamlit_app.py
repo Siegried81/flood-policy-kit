@@ -116,7 +116,21 @@ def load_geometry() -> list[dict] | None:
     say what is missing rather than fail.
     """
     state = _build_state(GEOMETRY_CACHE)
+    if state is None and _fetch_geometry() is None:
+        state = _build_state(GEOMETRY_CACHE)
     return None if state is None else _load_geometry(state)
+
+
+# Ten minutes, not forever: this caches the OUTCOME of a download attempt, so an
+# offline machine pays the network timeout once rather than on every rerun, and
+# a failure is still retried once the network is back - the absence-cached-for-
+# life bug `_build_state` describes, bounded instead of reintroduced.
+@st.cache_resource(ttl=600, show_spinner="Downloading the GISCO boundaries for the map…")
+def _fetch_geometry() -> str | None:
+    """None once `regions.geojson` exists, otherwise why it could not be made."""
+    from scripts import build_geometry
+
+    return build_geometry.ensure(GEOMETRY_CACHE)
 
 
 # The cached halves. `mtime` is the cache KEY and is deliberately unused in the
@@ -316,8 +330,9 @@ with map_tab:
     features = load_geometry()
     if features is None:
         st.warning(
-            "No polygons to draw. Build them with "
-            "`python scripts/build_geometry.py`, which writes "
+            "No polygons to draw. The app tried to download the GISCO boundaries "
+            f"and build them itself, and could not ({_fetch_geometry()}). Build "
+            "them with `python scripts/build_geometry.py`, which writes "
             "`data/processed/regions.geojson` in seconds from one boundary file. "
             "It is not committed - the GISCO boundary terms do not let the "
             "repository pass the polygons on - so each machine builds its own."
@@ -694,7 +709,7 @@ with context_tab:
             )
             basins_columns = [c for c in ("nuts_id", "shared_basin_share",
                                           "basin_area_share", "basin_countries_max",
-                                          "shared_with")
+                                          "shared_basins", "shared_with")
                               if c in context.columns]
             st.dataframe(
                 context.nlargest(15, "shared_basin_share")[basins_columns],

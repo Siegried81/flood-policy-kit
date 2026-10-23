@@ -15,7 +15,7 @@ import geopandas as gpd
 import numpy as np
 import pytest
 import requests
-from shapely.geometry import box, mapping
+from shapely.geometry import Polygon, box, mapping
 
 from src import basins
 
@@ -496,3 +496,79 @@ def test_check_crosswalk_refuses_a_code_the_layer_does_not_have():
     )
     with pytest.raises(ValueError, match="does not have"):
         basins.check_crosswalk(districts)
+
+
+def test_a_region_is_told_the_name_of_the_basin_it_shares():
+    """"Shared with NL" says who to call; the basin's name says about what. The
+    name is the crosswalk's own `name`, never the id, and it sits beside the
+    partner list on the same shared basins."""
+    admin = gpd.GeoDataFrame(
+        {"country": ["BE", "NL"], "id": ["be", "nl"]},
+        geometry=[box(0, 0, 10 * KM, 10 * KM), box(10 * KM, 0, 20 * KM, 10 * KM)],
+        crs="EPSG:3035",
+    )
+    districts = gpd.GeoDataFrame(
+        {"thematicIdIdentifier": ["BESCHELDE_VL", "NLSC"]},
+        geometry=[box(0, 0, 10 * KM, 10 * KM), box(10 * KM, 0, 20 * KM, 10 * KM)],
+        crs="EPSG:3035",
+    )
+    out = basins.shared_basin_exposure(
+        admin, districts, crosswalk={"BESCHELDE_VL": "scheldt", "NLSC": "scheldt"}
+    )
+    assert out["shared_basins"].tolist() == [["Scheldt"], ["Scheldt"]]
+
+
+def test_an_unshared_basin_is_not_named_as_shared(two_countries):
+    """Basin B lies in Belgium alone: naming it beside `shared_with` would say
+    the region shares a basin it governs entirely."""
+    admin, districts = two_countries
+    out = basins.shared_basin_exposure(admin, districts, crosswalk={})
+    assert out["shared_basins"].iloc[1] == []
+    assert out["shared_basins"].iloc[0] == ["A"], "no declared name: the id, not nothing"
+
+
+def test_the_basin_holding_most_of_the_region_is_named_first():
+    """A region in two shared basins lists the one that matters most to it
+    first, not the alphabetically first."""
+    admin = gpd.GeoDataFrame(
+        {"country": ["BE", "NL"], "id": ["be", "nl"]},
+        geometry=[box(0, 0, 20 * KM, 20 * KM), box(20 * KM, 0, 40 * KM, 20 * KM)],
+        crs="EPSG:3035",
+    )
+    # Meuse covers 14 km of the 20 km Belgian square, Scheldt 6 km - both above
+    # the 50 km2 floor in each country, so both are shared.
+    districts = gpd.GeoDataFrame(
+        {"thematicIdIdentifier": ["S", "M"]},
+        geometry=[box(0, 0, 40 * KM, 6 * KM), box(0, 6 * KM, 40 * KM, 20 * KM)],
+        crs="EPSG:3035",
+    )
+    out = basins.shared_basin_exposure(
+        admin, districts, crosswalk={"S": "scheldt", "M": "meuse"}
+    )
+    assert out["shared_basins"].iloc[0] == ["Meuse", "Scheldt"]
+
+
+def test_the_shares_never_read_above_one():
+    """The union of a region's pieces and the region are areas of different
+    vertex lists, and on the real layer 153 regions read 1.0000000000000022 for
+    a share. Clipped, so a region wholly inside reads exactly 1.0."""
+    admin = gpd.GeoDataFrame(
+        {"country": ["BE", "NL"], "id": ["be", "nl"]},
+        # A pentagon found by search: its overlay with a district enclosing it
+        # comes back 2e-16 larger than itself, the same noise as on the real layer.
+        geometry=[
+            Polygon([(13108.986, 23207.161), (6157.302, 40661.085), (33114.48, 44367.175),
+                     (39623.469, 33378.079), (36686.759, 28192.198)]),
+            box(100 * KM, 0, 110 * KM, 10 * KM),
+        ],
+        crs="EPSG:3035",
+    )
+    districts = gpd.GeoDataFrame(
+        {"thematicIdIdentifier": ["X"]},
+        geometry=[box(-100 * KM, -100 * KM, 300 * KM, 300 * KM)],
+        crs="EPSG:3035",
+    )
+    out = basins.shared_basin_exposure(admin, districts, crosswalk={})
+    for column in ("shared_basin_share", "basin_area_share"):
+        assert (out[column] <= 1.0).all(), out[column].tolist()
+        assert np.allclose(out[column], 1.0)
