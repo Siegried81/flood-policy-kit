@@ -566,7 +566,16 @@ def _fetch_one(
                 sha256_of(existing), stamp, error=None,
             )
         quarantined = existing.with_name(existing.name + ".rejected")
-        existing.replace(quarantined)
+        try:
+            existing.replace(quarantined)
+        except OSError as exc:
+            # Same Windows lock as the `partial.replace` below, and the same
+            # contract: a file held open is a failed result, never a raise that
+            # takes `fetch_all` and the manifest down with it.
+            return FetchResult(
+                source_id, url, None, None, existing.stat().st_size, None, stamp,
+                error=f"could not move the stale file aside as {quarantined.name}: {exc}",
+            )
         log.warning("%s: existing file is not a document (%s); moved to %s and "
                     "fetching again", source_id, rejection, quarantined.name)
 

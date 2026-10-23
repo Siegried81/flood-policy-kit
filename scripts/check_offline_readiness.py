@@ -25,7 +25,8 @@ disk and is not a document, and "non-empty" alone cannot tell the two apart.
 
 **The two caches `src.fetch` does not fill.** The EEA river-basin layer is a
 slow REST service cached by `src/basins.py`, and the Copernicus climate
-projections are downloaded by hand into `src/climate.py`'s folder. Neither is
+projections are fetched by `scripts/fetch_cds_member.py` (or by hand) into
+`src/climate.py`'s folder. Neither is
 declared as a fetchable file, so neither showed up in the table above, and the
 README said so - but a reader of a green verdict does not read the README. They
 are WARN rather than FAIL because the map and the brief run without them; the
@@ -36,7 +37,7 @@ only once the body has been accepted, so a `.part` is the signature of a
 download that died mid-transfer. The missing file it would have become already
 shows up in the table above; naming the `.part` separately is what tells you the
 fetch was interrupted rather than never started - a distinction that decides
-whether re-running `src.fetch` costs you one file or the whole 3.82 GiB.
+whether re-running `src.fetch` costs you one file or the whole 6.4 GiB.
 
 **The manifest against the disk.** `data/raw/manifest.json` is the provenance
 record that lets a figure in the brief be traced back to an exact file. It is
@@ -49,15 +50,16 @@ responses cached under `data/processed/rdh_cache/` are not an optimisation: they
 are the only offline route to an observed loss figure. An empty cache means the
 validation half of the brief has nothing behind it.
 
-**Ollama, and the model the code actually defaults to.** `src/rag.py` falls back
-to Ollama when no Groq key is set, with `llama3.2:3b` as its default model name. A
+**Ollama, and the model the code actually defaults to.** `src/rag.py` asks
+Claude, then Groq, then Ollama - Ollama alone when neither key is set, with
+`llama3.2:3b` as its default model name. A
 reachable Ollama holding a *different* model is the trap worth checking for: the
 request reaches the right port and is refused by the wrong name, which reads as a
 dead model server rather than as a one-word configuration fix.
 
-**Whether a generation key is set at all**, because `rag.complete` prefers Groq
-whenever `GROQ_API_KEY` is present - and Groq is on the far side of the venue
-Wi-Fi. A key left in `.env` silently turns the demo back into an online demo.
+**Whether a generation key is set at all**, because `rag.complete` prefers
+Claude whenever `ANTHROPIC_API_KEY` is present and Groq whenever `GROQ_API_KEY`
+is - and both are on the far side of the venue Wi-Fi. A key left in `.env` silently turns the demo back into an online demo.
 
 It makes no network request other than the Ollama probe, and that probe only
 runs when `OLLAMA_URL` points at this machine or at the Compose service beside
@@ -90,11 +92,9 @@ from src.data_io import DATA, sources  # noqa: E402
 from src.fetch import expand, target_of, why_not_a_document_on_disk  # noqa: E402
 from src.rdh import CACHE_DIR as RDH_CACHE_DIR  # noqa: E402
 from src.rdh import COLLECTIONS as RDH_COLLECTIONS  # noqa: E402
-
-# The default `src/rag.py` hands to Ollama when OLLAMA_MODEL is unset. Restated
-# here rather than imported because rag.py reads it inline in `complete()` and
-# exposes no constant to import; if that default ever moves, move this with it.
-RAG_DEFAULT_OLLAMA_MODEL = "llama3.2:3b"
+from src.rag import GROQ_KEY_VARS  # noqa: E402
+# Imported, not restated: the check must certify the model `rag` asks for.
+from src.rag import OLLAMA_DEFAULT_MODEL as RAG_DEFAULT_OLLAMA_MODEL  # noqa: E402
 # Where `src/basins.py` caches the EEA river-basin layer and where `src/climate.py`
 # reads the hand-downloaded CDS files, both relative to the data directory.
 # Restated rather than imported, and for a reason this script lives by: both
@@ -437,9 +437,8 @@ def check_basins_cache(data_dir: Path = DATA) -> Check:
 def check_climate_files(data_dir: Path = DATA) -> Check:
     """At least one CDS projection file is in the folder `src/climate.py` reads.
 
-    These are downloaded by hand through the CDS form (the form is where a
-    request's cost is checked against its cap), so no fetcher can be blamed for
-    their absence and no manifest records them. Counted, not validated: parsing
+    These come from `scripts/fetch_cds_member.py` or the CDS form, not from
+    `src.fetch`, so no manifest records them. Counted, not validated: parsing
     the filename contract lives in `climate.describe`, behind a geopandas import
     this script avoids - see `CLIMATE_DIR_REL`.
     """
@@ -452,8 +451,9 @@ def check_climate_files(data_dir: Path = DATA) -> Check:
         "climate projections",
         "WARN",
         f"no .nc file under {CLIMATE_DIR_REL.as_posix()} - the future-climate layer is empty",
-        fix="download the ensemble members through the CDS form (docs/datasets.md) "
-        "into that folder; the layer is optional on the day",
+        fix="run `python scripts/fetch_cds_member.py` (needs CDSAPI_KEY or ~/.cdsapirc), "
+        "or download the members through the CDS form (docs/datasets.md) into that "
+        "folder; the layer is optional on the day",
     )
 
 
@@ -478,8 +478,8 @@ def check_ollama(url: str | None = None, model: str | None = None) -> Check:
     gap between `llama3.2:3b` and `llama3.2:1b` is a one-word edit, but only for
     someone who is told which word.
     """
-    url = url or os.getenv("OLLAMA_URL", "http://localhost:11434")
-    wanted = model or os.getenv("OLLAMA_MODEL", RAG_DEFAULT_OLLAMA_MODEL)
+    url = url or os.getenv("OLLAMA_URL", "").strip() or "http://localhost:11434"
+    wanted = model or os.getenv("OLLAMA_MODEL", "").strip() or RAG_DEFAULT_OLLAMA_MODEL
     host = urlparse(url).hostname or ""
     if host not in LOCAL_HOSTS:
         return Check(
@@ -527,27 +527,40 @@ def check_ollama(url: str | None = None, model: str | None = None) -> Check:
 def check_generation_key(env: dict[str, str] | None = None) -> Check:
     """Which provider `rag.complete` would use, and whether it survives offline.
 
-    `complete()` prefers Groq whenever `GROQ_API_KEY` is set, and does not fall
-    back when that call fails. So a key left in `.env` is not a safety net on the
-    day: it is the thing that routes the demo through the venue Wi-Fi. A WARN
-    rather than a FAIL, because it is the right setting on every day except this
-    one, and only the owner knows which day it is.
+    `complete()` prefers Claude whenever `ANTHROPIC_API_KEY` is set and Groq
+    whenever `GROQ_API_KEY` is, and does not fall back on every failure. So a key
+    left in `.env` is not a safety net on the day: it is the thing that routes
+    the demo through the venue Wi-Fi. A WARN rather than a FAIL, because it is
+    the right setting on every day except this one, and only the owner knows
+    which day it is. Claude is checked first because it is asked first.
     """
     env = os.environ if env is None else env
     ollama_model = env.get("OLLAMA_MODEL", RAG_DEFAULT_OLLAMA_MODEL)
-    if env.get("GROQ_API_KEY", "").strip():
+    if env.get("ANTHROPIC_API_KEY", "").strip():
         return Check(
             "generation provider",
             "WARN",
-            "GROQ_API_KEY is set, so rag.complete() calls Groq over the network "
+            "ANTHROPIC_API_KEY is set, so rag.complete() calls Claude over the network "
             f"instead of local Ollama ({ollama_model})",
-            fix="for an offline run, comment GROQ_API_KEY out of .env (or start the "
-            "container without it) so the local model is the one that answers",
+            fix="for an offline run, comment ANTHROPIC_API_KEY (and every GROQ_API_KEY*) "
+            "out of .env so the local model is the one that answers",
+        )
+    # Every name `rag.groq_keys()` rotates over, not only the first: commenting
+    # out GROQ_API_KEY alone still leaves GROQ_API_KEY_2.._5 routing to Groq.
+    groq_set = [name for name in GROQ_KEY_VARS if env.get(name, "").strip()]
+    if groq_set:
+        return Check(
+            "generation provider",
+            "WARN",
+            f"{', '.join(groq_set)} set, so rag.complete() calls Groq over the network "
+            f"instead of local Ollama ({ollama_model})",
+            fix=f"for an offline run, comment {', '.join(groq_set)} out of .env (or start "
+            "the container without them) so the local model is the one that answers",
         )
     return Check(
         "generation provider",
         "OK",
-        f"no GROQ_API_KEY: rag.complete() uses local Ollama ({ollama_model})",
+        f"no ANTHROPIC_API_KEY or GROQ_API_KEY: rag.complete() uses local Ollama ({ollama_model})",
     )
 
 

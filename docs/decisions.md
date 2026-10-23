@@ -1955,3 +1955,125 @@ evidence; the threshold should then be revisited, not kept by habit.
   `append_row` on `/app/docs/ai_usage_log.md` succeeds in the rebuilt image.
 - **What changes in the numbers:** nothing. An entry logged in a container
   lives in that container unless `docs/` is mounted from the host.
+
+## 2026-10-20 — Claude is asked first when its key is set
+
+- **What:** `src/rag.py::complete_with_provider` calls Claude through the
+  official `anthropic` SDK (`_anthropic`) whenever `ANTHROPIC_API_KEY` is set,
+  before the existing Groq-then-Ollama chain, now `_groq_then_ollama`.
+  `ANTHROPIC_MODEL` picks the model; the default is `claude-haiku-5-5`, the
+  cheapest. `Completion.provider` can now be `"anthropic"`.
+- **Why:** the project has paid Anthropic API credit to spend, and no code path
+  could reach it.
+- **The failure split is the one Groq already had.** A 429, any 5xx (the 529
+  "overloaded" included) and a connection error or timeout hand the same prompt
+  to Groq, then Ollama, and `fallback_reason` names every hop in order,
+  separated by `; `. A 400/401/403/404 is a wrong key or model name and raises
+  without trying anything else. The SDK's own retries are off
+  (`max_retries=0`): the chain is the retry. A refusal is HTTP 200 with no
+  text, so it raises `EmptyCompletion` like an empty answer.
+- **No `temperature` on the Claude call:** the current Haiku and Sonnet reject a
+  non-default value with a 400. Groq keeps its 0.2.
+- **Tests:** `tests/conftest.py` clears `ANTHROPIC_API_KEY` and
+  `ANTHROPIC_MODEL` for every test, because `src/__init__.py` loads `.env` and
+  any test that drives the provider chain - the `/api/ask` 502 test is one -
+  would otherwise call the real API with the developer's key. The Claude tests
+  replace `anthropic.Anthropic` with a fake, so none reaches the network.
+- **Offline readiness:** `check_generation_key` warns on `ANTHROPIC_API_KEY`
+  the way it warns on `GROQ_API_KEY`, and checks it first because Claude is
+  asked first.
+- **What changes in the numbers:** nothing that is measured. Which model wrote
+  a brief section changes when the key is set, and the UI already says which
+  provider answered.
+
+## 2026-10-23 — pre-hackathon audit: what the model reads, and when it falls back
+
+- **`/api/draft` reads one scenario, ranked, inside the budget.** It sent
+  `_table().head(rows)`: file order, so 200 rows of Albania to Germany at the
+  10-year period whatever the page showed, 29,613 characters against the
+  11,000 of `rag.PROMPT_CHAR_BUDGET` - over Groq every React draft came back
+  413 and fell to the 3B local model. It now narrows with `_one_return_period`
+  (the rarest period by default, `return_period` in the request otherwise),
+  ranks by `exposed_share`, cuts with `fit_rows` to what the budget leaves, and
+  says in the prompt that the table is a ranked extract. Measured on the frozen
+  table: 68 regions at RP500, 10,898 characters with the system prompt. This is
+  what the Streamlit tab already did. The React panel sends the period on
+  screen and shows the period and row count the model read.
+- **An empty Claude balance falls back.** The API answers it with HTTP 400
+  "Your credit balance is too low", the status of a malformed request, so the
+  2026-10-20 split re-raised it and the draft tab showed "No model reachable"
+  with Groq and Ollama configured. Like Groq's 413, it is a "this minute"
+  failure: `_anthropic_fallback_reason` recognises it by the API's message.
+  Every other 400 still raises.
+- **The climate ensemble refuses mixed emissions scenarios.** `experiment`
+  (rcp45/rcp85) joins the fields every member must share. All 14 files on disk
+  are rcp85, so no figure moves.
+- **Exposure parts name which single mask was kept.** `m1` alone could not tell
+  `--keep-permanent-water` from `--keep-spurious-areas`, so the second run
+  reused the first one's numbers. Both masks and none keep their old names
+  (`m2`, `m0`), so the nine frozen parts are still found and no figure moves.
+- **The return periods are nested in intent, not cell by cell.** Measured on
+  the frozen table: 8 of 10,760 period-to-period steps lose people, in FRG01,
+  FRD22, DE927 and RS211. The docs stop asserting strict nesting; the rule
+  "never sum across periods" is unchanged. `limitations.md` has the figures.
+- **Readiness counts every Groq key.** `check_generation_key` checked
+  `GROQ_API_KEY` only, while `rag.groq_keys()` rotates over `_2` to `_5` too,
+  so following its own fix still left the demo online and reported OK.
+- **The suite clears every provider key and the LangSmith flags**, not only
+  `ANTHROPIC_*`: `.env` holds real Groq keys and `LANGSMITH_TRACING=true`, and
+  `test_workflow.py` was uploading its traces.
+- **Streamlit is published on 127.0.0.1**, like the API: it spends the model
+  key and writes `approved.md` and the AI log, and `FLOOD_APPROVE_TOKEN` does
+  not guard it. A LAN demo now has to change the port mapping on purpose.
+- **Claude defaults to Opus, the owner's choice.** `ANTHROPIC_DEFAULT_MODEL`
+  is `claude-opus-5-5`, replacing the 2026-10-20 Haiku default: the brief is
+  the deliverable and one section is one call. About 40 times Haiku's price per
+  token ($4/$20 against $0.10/$0.50 per MTok) and slower, since it thinks
+  before answering; a call past the 90 s timeout is a connection error and
+  falls back to Groq like one. `ANTHROPIC_MODEL` still overrides it.
+- **The React approve button asks for the token when the server wants one.**
+  `/api/meta` reports `approve_token_required` (never the token), and the
+  panel shows a password field the approver types into; it is sent as
+  `X-Approve-Token` per call and never built into the bundle. Before, setting
+  `FLOOD_APPROVE_TOKEN` as `.env.example` advises made every React approval a
+  403.
+- **The Walloon depth layer is the by-hand download under its declared name.**
+  `ZONES_INONDEES_202107_IDW450_HEAU_GEOTIFF_31370.zip` (500,736,096 B,
+  downloaded 2026-10-10 from the same geoportal record) is now
+  `wallonia_observed_water_depth_2021.zip`, with `suffix: .zip` on the entry.
+  Its manifest url is the expired job's; the entry says so. 65 of 65 declared
+  files present, 5.56 GiB.
+- **The LangGraph workflow makes one model call per run.** `MAX_REDRAFTS` is 0,
+  the owner's choice, against the repo rule "every LLM call is a single
+  structured call, not an agent". Measured before: a weak draft cost 2 calls
+  (the counter is 1 after the first draft, so 2 allowed one redraft), and the
+  redraft resent the same prompt - a re-roll, not a correction. A weak draft now
+  reaches the gate at once with its grounding score and invalid citations. No
+  UI imports the workflow, so the demo is unchanged.
+- **The two frozen tables are committed; the polygons are not.** The owner's
+  choice. `exposure.parquet` (240 KB) and `context.parquet` (288 KB) enter git
+  with `data/processed/DATA_NOTICE.md`, so a clone, a teammate and the CI
+  runner read the same frozen figures, and every rebuild is a diff. The rest of
+  `data/` stays ignored. `regions.geojson` stays out: the GISCO terms grant a
+  non-transferable, non-commercial right to use and process the NUTS geometry,
+  which a public MIT repository cannot pass on; it rebuilds in seconds. The
+  frozen exposure table predates the `poverty_rate_pct` rename (built
+  2026-10-07, after the people-weighted extrapolation of 2026-10-06), so it
+  carries the legacy names that every reader maps; no figure differs.
+- **Every map carries "© EuroGeographics for the administrative boundaries".**
+  The GISCO terms require it in the map legend, and it was nowhere in the repo:
+  `svgmap` draws it into the SVG, the React figcaption states it, and the
+  README gained a licence and credits section.
+- **A blank provider setting means its default.** `ANTHROPIC_MODEL=`,
+  `GROQ_MODEL=`, `OLLAMA_MODEL=` and `OLLAMA_URL=` were read as "", so a blank
+  line asked Claude or Ollama for a model called "" - for Claude a 400 that does
+  not fall back, for Ollama the offline path dead on a typo. `OLLAMA_DEFAULT_MODEL`
+  is now a constant in `rag.py` that the readiness check imports.
+- **`/api/draft` claims a ranking only when it made one**: without `total_pop`
+  the rows keep file order, and the prompt and the panel say so.
+- **Streamlit's no-table warning names the script and the reason.** It named a
+  library function, on exactly the machines without the build: `data/` is not
+  committed. It now says so, and offers the copy of the three small processed
+  files before the multi-hour rebuild.
+- **What changes in the numbers:** none of the frozen figures. What the model
+  is shown for a React draft changes, as above.

@@ -183,6 +183,16 @@ def test_an_absent_table_still_explains_how_to_build_one():
     assert "No exposure table yet" in _texts(app_test)
 
 
+def test_an_absent_table_names_the_script_and_why_it_is_missing():
+    """The warning named `exposure_by_return_period`, a library call. The frozen
+    table is committed, so the machine that hits this is an old checkout or a
+    container without the bind mount: say so, then name the script."""
+    texts = _texts(_run(None))
+    assert "scripts/build_exposure.py" in texts
+    assert "git pull" in texts and "./data" in texts
+    assert "exposure_by_return_period" not in texts
+
+
 def test_either_identifier_spelling_is_accepted():
     """NUTS3 for Europe, LAU for a zoom: the column name differs by run.
 
@@ -993,6 +1003,15 @@ def test_a_logged_entry_lands_inside_the_table_not_under_the_prose(tmp_path):
     assert max(table) < next(
         i for i, line in enumerate(lines) if line.startswith("## ")
     ), "the new row must sit above the closing section, not below it"
+
+
+
+def test_a_pipe_typed_in_a_log_field_stays_in_its_cell():
+    """`|` ends a Markdown cell, so "Claude | Haiku" typed as the tool shifted
+    every later field one column right; a newline ended the row itself."""
+    row = usage_log.table_row(["Thu 10:00", "Claude | Haiku", "two\nlines", "ok"])
+    assert row == "| Thu 10:00 | Claude \\| Haiku | two lines | ok |\n"
+    assert row.count(" | ") == 3
 
 
 def test_the_log_does_not_offer_links_the_app_cannot_serve():

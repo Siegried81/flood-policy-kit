@@ -29,8 +29,10 @@ way, and it will be revoked rather than merely deleted.
 
 - The kit runs offline on public data (JRC, Eurostat, EEA, Copernicus); it
   stores no personal data.
-- Keys it may read: `GROQ_API_KEY`, `LANGSMITH_API_KEY`, `NEWSAPI_KEY`,
-  `RDH_BEARER_TOKEN`. None is needed to run the demo offline.
+- Keys it may read: `ANTHROPIC_API_KEY`, `GROQ_API_KEY` (and `GROQ_API_KEY_2`
+  to `_5`), `LANGSMITH_API_KEY`, `NEWSAPI_KEY`, `RDH_BEARER_TOKEN`, `CDSAPI_KEY`
+  and the `FLOOD_APPROVE_TOKEN` shared secret. None is needed to run the demo
+  offline.
 - In scope: anything that makes the draft workflow publish text a human did not
   approve, a retrieved document that changes the model's instructions, or a
   fetch that bypasses `robots.txt` or the declared sources in

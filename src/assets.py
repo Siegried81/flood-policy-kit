@@ -48,7 +48,7 @@ def built_path(archive: Path | str = BUILT_ZIP) -> str:
         raise SystemExit(
             f"{archive} is missing. Run `python -m src.fetch` first: it is "
             f"declared as `ghsl_built_europe` in config/sources.yaml and "
-            f"`data/` is not committed."
+            f"`data/raw/` is not committed."
         )
     with zipfile.ZipFile(archive) as zf:
         tifs = [n for n in zf.namelist() if n.lower().endswith(".tif")]

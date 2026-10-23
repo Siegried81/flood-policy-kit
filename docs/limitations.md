@@ -23,6 +23,13 @@ rebuilt. The findings and recommendations themselves are in
   30,730,197 at RP500. A headcount quoted without its return period is not a
   number. [`policy_answer.md` §3](policy_answer.md#3-the-measured-base-2026-10-08),
   [`geospatial_crash_course.md`](geospatial_crash_course.md#return-period-what-a-100-year-flood-is-not).
+- **Nested in intent, not cell by cell.** Each JRC depth raster is a separate
+  model run, so a rarer period can be shallower in places. Measured 2026-10-23
+  on the frozen table: 8 of the 10,760 period-to-period steps (1,345 regions
+  x 8) lose people, in 4 regions. FRG01 (Loire-Atlantique) reads 96,027 at
+  RP100, 81,171 at RP200 and 75,408 at RP500; FRD22, DE927 and RS211 also dip.
+  Totals at EU scale still grow with the period; never claim that every
+  region's does.
 - **The depth threshold is a choice, and it moves the headline.** The build
   counts a cell as flooded above 0.5 m, and masks permanent water bodies and the
   JRC's own spurious-depth areas; on the Benelux the water-body mask alone moves
@@ -313,10 +320,15 @@ here, still needs the following from the authority itself.
 
 Only what the repository shows.
 
-- **The data is not committed.** `data/` is ignored; a fresh clone has to fetch
-  about 5.1 GiB and run a multi-hour continental build before the API answers
-  anything but 404. CI therefore runs with no data, and a test that strays
-  outside the frozen harness passes locally and fails on the runner.
+- **Only the frozen tables are committed.** Since 2026-10-23,
+  `data/processed/exposure.parquet` and `context.parquet` are in git (about
+  530 KB, with `data/processed/DATA_NOTICE.md` for their sources); everything
+  else under `data/` - the 5.6 GiB of rasters, the caches, the backups - is
+  ignored. So a fresh clone answers with the frozen figures at once, but
+  rebuilding them still means fetching the rasters and a multi-hour
+  continental build. CI now has the tables too, which means a test that strays
+  outside the frozen harness passes there as well: hide the parquet and re-run
+  to check a test honestly.
   [`.gitignore`](../.gitignore), [`scope.md`](scope.md#what-the-nuts3-choice-produces-on-disk),
   [`decisions.md`, 2026-10-08 "cached there is no table"](decisions.md#2026-10-08--the-page-cached-there-is-no-table-and-never-looked-again).
 - **The offline check fails today.** Run 2026-10-08: 51 of 52 declared files
@@ -330,7 +342,11 @@ Only what the repository shows.
   their own WARN checks. Since 2026-10-12, 65 files are declared: the twelve
   policy documents added that day are missing until the next fetch, and the
   arXiv paper is now expected as `nist_robust_ai_alignment_limits.pdf`, so the
-  check stays BLOCKED until `python -m src.fetch` has run once more.
+  check stays BLOCKED until `python -m src.fetch` has run once more. Run
+  2026-10-23: that fetch has run, the Walloon depth layer is the by-hand
+  download of 10 October under its declared name (see its `sources.yaml`
+  entry), and 65 of 65 files are present (5.6 GiB). It still blocks on one
+  thing: Ollama answers on the owner's PC with no model pulled.
   [`scripts/check_offline_readiness.py`](../scripts/check_offline_readiness.py),
   root [`README.md`](../README.md).
 - **Dead configuration keys.** `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` and
@@ -344,7 +360,7 @@ Only what the repository shows.
   `technical_deep_dive.md` §7 is filled by `scripts/docs_numbers.py`; the
   per-file rows are not, and they drift: the table of 10 October had three
   wrong or missing rows by 12 October, and two more (`test_api.py`, `test_rag.py`)
-  by 14 October. Re-measured on 14 October (29 files, summing to the total); re-measure again after any test change. [`technical_deep_dive.md` §7](technical_deep_dive.md#7-the-test-suite).
+  by 14 October. Re-measured on 23 October (29 files, summing to the total); re-measure again after any test change. [`technical_deep_dive.md` §7](technical_deep_dive.md#7-the-test-suite).
 - **Whether the suite runs on Windows depends on a policy that flipped twice.**
   Smart App Control blocked `rasterio`'s DLL on 2026-10-07 and allowed it again
   the next morning with nothing reinstalled; the WSL2 venv is the route that

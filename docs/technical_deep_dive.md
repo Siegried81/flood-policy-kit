@@ -18,7 +18,7 @@ change to what a number means; this file describes the current state only.
 config/sources.yaml          one file owns every URL
         │
         ▼
-python -m src.fetch          65 files, ≈5.09 GiB, idempotent, robots-aware
+python -m src.fetch          65 files, ≈5.56 GiB, idempotent, robots-aware
         │
         ├───────────────┬──────────────┐
         ▼               ▼              ▼
@@ -321,7 +321,7 @@ draft, verify, approve — and a human gate before anything is written.
 | Guard | Value | Prevents |
 |---|---|---|
 | `RECURSION_LIMIT` | 8 | a graph that loops |
-| `MAX_REDRAFTS` | 2 | a model that rewrites forever |
+| `MAX_REDRAFTS` | 0 | more than one model call per run: a weak draft goes to the human flagged |
 | `MIN_GROUNDING` | 0.7 | a draft that cites nothing |
 
 **Verification is not an LLM call.** `src/rag.py` grounds every claim in the
@@ -344,12 +344,14 @@ down in advance.
 
 ## 7. The test suite
 
-**<!-- numbers:tests_collected -->703<!-- /numbers --> tests, offline**: no network, no model, no key. Measured 12 October 2026 in
-WSL2: all <!-- numbers:tests_collected -->703<!-- /numbers --> collect and pass, nothing deselected; the same day Windows
+**<!-- numbers:tests_collected -->751<!-- /numbers --> tests, offline**: no network, no model, no key. Measured 12 October 2026 in
+WSL2: all <!-- numbers:tests_collected -->751<!-- /numbers --> collect and pass, nothing deselected; the same day Windows
 blocked `rasterio` again. Re-run on 14 October 2026: still blocked on Windows
 (the five raster modules, 59 tests, do not collect), and in WSL2 all 702 pass
 once `test_climate.py`'s dry-run test stopped reading the CDS files already in
-`data/` (`fetch_cds_member.py` now resolves `OUT_DIR` at call time). Do not quote either as a property of the platform — Smart App Control moved to enforcement on 7 October
+`data/` (`fetch_cds_member.py` now resolves `OUT_DIR` at call time). Re-run on
+23 October 2026: rasterio imports on Windows again and every test collects and
+passes there. Do not quote either as a property of the platform — Smart App Control moved to enforcement on 7 October
 2026 and refused rasterio's unsigned DLLs, which left 433 collectable and 431
 passing on Windows while WSL2 ran the lot; by the next morning it allowed the
 same wheel again with nothing reinstalled. **The policy moves both ways, so
@@ -364,31 +366,31 @@ block that `scripts/docs_numbers.py --write` fills from `pytest --collect-only`,
 and `tests/test_docs_numbers.py` fails the suite when any marked block in the
 docs disagrees with the repository. Edit the prose, never the digit.
 
-Per-file counts measured 14 October 2026 with
+Per-file counts measured 23 October 2026 with
 `pytest --collect-only -q | grep '::' | cut -d: -f1 | sort | uniq -c`; they sum to the
 marked total above. Twenty-nine files — an earlier table listed twenty-two and
 summed to 473, a figure that had survived three suite changes by being typed.
 
 | File | Tests | Guards |
 |---|---|---|
-| `test_nlquery.py` | 51 | natural-language questions over the table: the spec whitelist, unknown columns and operators refused, one period, nulls counted as not measured, one model call and no retry |
-| `test_offline_readiness.py` | 52 | the demo runs with the Wi-Fi off: the three verdicts, `--strict`, a rejected file is not present, the two caches `src.fetch` does not fill |
+| `test_nlquery.py` | 52 | natural-language questions over the table: the spec whitelist, unknown columns and operators refused, one period, nulls counted as not measured, one model call and no retry |
+| `test_offline_readiness.py` | 56 | the demo runs with the Wi-Fi off: the three verdicts, `--strict`, a rejected file is not present, the two caches `src.fetch` does not fill |
 | `test_validate.py` | 50 | the scoring grid, the three metrics, `None` vs `0.0` |
-| `test_api.py` | 63 | the routes, the 404s that name their builder, the JSX guards, a table frozen before the units rename, the approve token and the bounds on `k` |
-| `test_streamlit_app.py` | 55 | the fallback UI, the translation and ask-the-table tabs, the climate and coverage caveats, the density, income and Natura 2000 sections, a rebuilt table replacing the cached one, a table frozen before the units rename |
-| `test_fetch.py` | 59 | robots, idempotency, multi-file expansion, a stale rejection page is quarantined, colliding paths are refused, the cited policy sources are declared and every corpus file lands in a format the index reads |
-| `test_rag.py` | 41 | cite-or-refuse, and a fence no spelling of the closing tag escapes |
+| `test_api.py` | 72 | the routes, the 404s that name their builder, the JSX guards, a table frozen before the units rename, the approve token and the bounds on `k` |
+| `test_streamlit_app.py` | 57 | the fallback UI, the translation and ask-the-table tabs, the climate and coverage caveats, the density, income and Natura 2000 sections, a rebuilt table replacing the cached one, a table frozen before the units rename |
+| `test_fetch.py` | 60 | robots, idempotency, multi-file expansion, a stale rejection page is quarantined, colliding paths are refused, the cited policy sources are declared and every corpus file lands in a format the index reads |
+| `test_rag.py` | 67 | cite-or-refuse, and a fence no spelling of the closing tag escapes |
 | `test_losses.py` | 29 | the RDH euro vintages and the levelling |
 | `test_basins.py` | 27 | the shared-basin layer: the declared crosswalk, the sliver floor |
-| `test_exposure.py` | 23 | the two modes, `nodata_means_dry`, the masks, the build checkpoint |
-| `test_workflow.py` | 23 | the five nodes, the guards, the human gate |
-| `test_climate.py` | 31 | the future layer: provenance, the median, the ensemble and its quartiles, a member per simulation, the fetcher against a mocked CDS |
+| `test_exposure.py` | 25 | the two modes, `nodata_means_dry`, the masks, the build checkpoint |
+| `test_workflow.py` | 24 | the five nodes, the guards, the human gate |
+| `test_climate.py` | 32 | the future layer: provenance, the median, the ensemble and its quartiles, a member per simulation, the fetcher against a mocked CDS |
 | `test_vulnerability.py` | 21 | the composite index, its sensitivity, and what one indicator cannot prove |
 | `test_rdh.py` | 16 | the paged client and its cache |
 | `test_toon_io.py` | 15 | the compact table encoding for prompts, and a tokenizer that cannot fetch its table says so |
 | `test_mcp_server.py` | 12 | the three intent-based MCP tools and their flat TOON answers |
 | `test_apsfr.py` | 13 | the two reporting cycles, the dissolve, the claim it must not make |
-| `test_svgmap.py` | 16 | the offline choropleth: quantile classes, holes kept, the outermost regions out of the extent, hatching where the chains disagree, a legend that names its sixths and stays inside the viewBox |
+| `test_svgmap.py` | 17 | the offline choropleth: quantile classes, holes kept, the outermost regions out of the extent, hatching where the chains disagree, a legend that names its sixths and stays inside the viewBox |
 | `test_demographics.py` | 21 | the sparse cube, the overlapping age buckets, the NUTS2 caveat, the unit in the name and the legacy names, a thinly published newest year, density and income pinned to their units |
 | `test_translate.py` | 12 | a translated figure never moves |
 | `test_events.py` | 11 | the coverage blind-spot probe |
@@ -398,7 +400,7 @@ summed to 473, a figure that had survived three suite changes by being typed.
 | `test_docs_numbers.py` | 10 | a number typed in a doc that no longer matches the code fails the suite |
 | `test_legislation.py` | 7 | every legal citation has a CELEX and a URL, and `policy_answer.md` cites no article the registry lacks |
 | `test_build_context.py` | 2 | the context build does not fail after writing its table |
-| `test_build_geometry.py` | 5 | the join key, the projection, the simplification |
+| `test_build_geometry.py` | 6 | the join key, the projection, the simplification |
 | `test_data_io.py` | 3 | the CRS engine is alive |
 
 `test_data_io.py` earns its three tests: a dead `pyproj` is the silent failure in
@@ -413,8 +415,8 @@ zonal statistic is the right arithmetic on the wrong piece of Europe. Measured o
 
 | Claim | Source |
 |---|---|
-| <!-- numbers:tests_collected -->703<!-- /numbers --> tests | `scripts/docs_numbers.py --write`, which runs `pytest --collect-only` and rewrites the marked blocks; the per-file counts are typed by hand |
-| 65 files, ≈5.09 GiB | `src.fetch.expand()` over `config/sources.yaml`; the bytes are the 6 October `Content-Length` plus the Natura 2000 GeoPackage measured on 12 October, a floor since twelve documents were added on 12 October |
+| <!-- numbers:tests_collected -->751<!-- /numbers --> tests | `scripts/docs_numbers.py --write`, which runs `pytest --collect-only` and rewrites the marked blocks; the per-file counts are typed by hand |
+| 65 files, ≈5.56 GiB | `src.fetch.expand()` over `config/sources.yaml`; the bytes measured on disk on 23 October, all 65 files present |
 | <!-- numbers:sources_declared -->57<!-- /numbers --> declared inputs, <!-- numbers:sources_verified -->49<!-- /numbers --> with a verification date, <!-- numbers:sources_licensed -->20<!-- /numbers --> with an explicit `licence:` | `scripts/docs_numbers.py` over `config/sources.yaml`: entries with an `id`; `verified` not null; `licence` non-empty |
 | 1,345 NUTS3 polygons | the GISCO NUTS 2024 file itself |
 | the 0.25% stripe discrepancy | two continental RP100 builds, 6 October 2026 |

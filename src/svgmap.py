@@ -334,6 +334,16 @@ def choropleth_svg(
             f'<text x="{x + 18}" y="{y + 11}" font-size="11" class="lg">{text}</text>'
         )
 
+    # The GISCO terms require this line on any map drawn from the NUTS
+    # boundaries, "in the map legend". Drawn into the SVG rather than captioned
+    # by each caller, so no map this module makes can leave it out. Bottom
+    # right of the map band, just above the legend, inside the viewBox.
+    credit = (
+        f'<text x="{width - pad}" y="{height - legend_h - 2}" font-size="9" '
+        'text-anchor="end" class="lg">© EuroGeographics for the administrative '
+        'boundaries</text>'
+    )
+
     # The legend colour is a class with a dark-mode rule rather than
     # `currentColor`: this SVG is rendered inside an iframe, which inherits
     # neither the app's text colour nor its theme, so `currentColor` would
@@ -358,5 +368,5 @@ def choropleth_svg(
         f'style="display:block;width:100%;height:auto" '
         f'preserveAspectRatio="xMidYMid meet" role="img" '
         f'aria-label="choropleth of {label}">\n{style}{defs}\n{body}\n'
-        f'{"".join(swatches)}\n</svg>'
+        f'{"".join(swatches)}\n{credit}\n</svg>'
     )

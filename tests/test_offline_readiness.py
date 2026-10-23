@@ -352,12 +352,13 @@ def test_a_different_model_is_ok_but_the_mismatch_is_stated(monkeypatch):
 
 
 def test_the_code_default_matches_what_rag_py_asks_for():
-    """The constant is restated here (rag.py reads it inline); a drift between the
-    two is a check that certifies the wrong model."""
-    import re
+    """A drift between the two is a check that certifies the wrong model, so the
+    check imports rag's constant and rag's call reads that same constant."""
+    from src import rag
 
+    assert readiness.RAG_DEFAULT_OLLAMA_MODEL is rag.OLLAMA_DEFAULT_MODEL
     source = (ROOT / "src" / "rag.py").read_text(encoding="utf-8")
-    assert re.search(r'os\.getenv\("OLLAMA_MODEL",\s*"' + re.escape(readiness.RAG_DEFAULT_OLLAMA_MODEL) + r'"\)', source)
+    assert 'os.getenv("OLLAMA_MODEL", "").strip() or OLLAMA_DEFAULT_MODEL' in source
 
 
 def test_wrong_tag_in_the_same_family_suggests_the_one_word_fix(monkeypatch):
@@ -398,6 +399,27 @@ def test_no_groq_key_means_the_local_model_answers():
 def test_a_blank_groq_key_is_not_a_key():
     """.env.example ships `GROQ_API_KEY=`, and an empty value must read as unset."""
     assert readiness.check_generation_key({"GROQ_API_KEY": "   "}).status == "OK"
+
+
+def test_a_claude_key_warns_that_the_demo_is_online_again():
+    """Claude is asked first, so its key routes the demo online even with no Groq key."""
+    check = readiness.check_generation_key({"ANTHROPIC_API_KEY": "sk-ant-x"})
+    assert check.status == "WARN"
+    assert "Claude" in check.detail
+    assert "ANTHROPIC_API_KEY" in check.fix
+
+
+@pytest.mark.parametrize("name", ["GROQ_API_KEY_2", "GROQ_API_KEY_5"])
+def test_a_secondary_groq_key_routes_the_demo_online_too(name):
+    """`rag.groq_keys()` rotates over GROQ_API_KEY and GROQ_API_KEY_2.._5, so
+    commenting out the first one alone still sends the demo to Groq."""
+    check = readiness.check_generation_key({name: "gsk_x"})
+    assert check.status == "WARN"
+    assert name in check.detail
+
+
+def test_a_blank_claude_key_is_not_a_key():
+    assert readiness.check_generation_key({"ANTHROPIC_API_KEY": " "}).status == "OK"
 
 
 # --- the whole run ----------------------------------------------------------

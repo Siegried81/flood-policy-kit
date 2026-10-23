@@ -1,6 +1,17 @@
-# Data: large, re-downloadable from config/sources.yaml via src/fetch.py
-data/
+# Data: large, re-downloadable from config/sources.yaml via src/fetch.py - except
+# the frozen tables. Those are the measurement itself, a few hundred KB, and
+# rebuilding them takes the 5.6 GiB of rasters and about 20 GB of RAM, so a clone,
+# a teammate's laptop and the CI runner read the same frozen figures. Every
+# rebuild therefore shows up as a diff: committing it is freezing it. Backups and
+# caches beside them stay out. `data/*` rather than `data/`, because git cannot
+# re-include a file inside an excluded directory.
+data/*
 !data/.gitkeep
+!data/processed/
+data/processed/*
+!data/processed/exposure.parquet
+!data/processed/context.parquet
+!data/processed/DATA_NOTICE.md
 
 # Python
 __pycache__/

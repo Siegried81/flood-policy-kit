@@ -242,7 +242,12 @@ export default function App() {
 
       {tab === "Context" && <ContextPanel names={names} />}
 
-      {tab === "Draft" && <DraftPanel />}
+      {tab === "Draft" && (
+        <DraftPanel
+          returnPeriod={returnPeriod}
+          approveTokenRequired={Boolean(meta?.approve_token_required)}
+        />
+      )}
 
       {tab === "Translation" && <TranslationPanel />}
     </main>

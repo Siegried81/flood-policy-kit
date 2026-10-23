@@ -61,14 +61,16 @@ def tracing_status() -> dict:
 
 # A hard ceiling on graph steps. Without one a confused graph can cycle until the
 # API budget is gone; the course calls this out and LangGraph builds it in.
-# The longest path is still 6 supersteps - retrieve, draft, verify, draft, verify,
-# approve - so 8 leaves the same margin it always did. The refusal path is
-# shorter, not longer: retrieve, refuse, approve is 3.
+# With no redraft the longest path is 4 supersteps - retrieve, draft, verify,
+# approve - so 8 is a wide margin. The refusal path is retrieve, refuse,
+# approve: 3.
 RECURSION_LIMIT = 8
-# How many redraft attempts verification may ask for before the graph gives up and
-# hands a flagged draft to the human. Bounded, so a model that cannot satisfy the
-# check fails visibly instead of spending money in a loop.
-MAX_REDRAFTS = 2
+# How many drafts verification may ask for in all before a weak one goes to the
+# human flagged (the counter is 1 after the first draft). 0 means exactly one
+# model call per run: a weak draft is never sent back, because the redraft
+# resent the same prompt - a re-roll, not a correction - and every run stays a
+# single structured call. Raise it to 2 for one re-roll.
+MAX_REDRAFTS = 0
 # Below this share of cited sentences the draft goes back for a redraft. It is a
 # confidence threshold in the course's sense: automate when high, escalate when low.
 MIN_GROUNDING = 0.7
@@ -86,7 +88,7 @@ class BriefState(TypedDict, total=False):
     # written by this module and not by a model.
     refused: bool
     draft: str
-    # Which provider answered the draft call, "groq" or "ollama", and why it
+    # Which provider answered the draft call, "anthropic", "groq" or "ollama", and why it
     # switched. Absent on a refusal, because nothing was generated.
     provider: str
     fallback_reason: str
@@ -207,7 +209,7 @@ def _verify(state: BriefState) -> BriefState:
 
 
 def _after_verify(state: BriefState) -> Literal["draft", "approve"]:
-    """Redraft on a weak result, but only `MAX_REDRAFTS` times.
+    """Redraft on a weak result while `MAX_REDRAFTS` allows it - by default never.
 
     The budget guard is the point: without it, a draft the model cannot ground
     loops forever. Past the limit the flagged draft goes to the human anyway,

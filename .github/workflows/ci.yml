@@ -24,7 +24,7 @@ jobs:
   # The image is how the geospatial half runs on the Windows host, and the README
   # recorded it as "reviewed but untested" for lack of a Docker daemon there. The
   # runner is the clean machine the dress rehearsal asks for: build the code-only
-  # stage (the portable one needs the 3.82 GiB data tree, which CI does not have)
+  # stage (the portable one needs the 6.4 GiB data tree, which CI does not have)
   # and prove the native stack the image exists for actually loads inside it.
   docker:
     runs-on: ubuntu-latest

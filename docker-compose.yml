@@ -16,7 +16,7 @@
 # bind-mount ./data, which keeps the image at ~2 GiB and means a finished download
 # is visible without a rebuild - the right trade while the fetch is still running
 # and the code is still changing. The `portable` service builds the image with the
-# 3.82 GiB inside it instead: that one runs on a borrowed laptop with no network
+# 6.4 GiB inside it instead: that one runs on a borrowed laptop with no network
 # and no copy of this repo, which is the only version that survives the venue.
 # Build it once the fetch is complete, and check it with the `check` service
 # before trusting it.
@@ -63,7 +63,7 @@ services:
   app:
     <<: *app-common
     ports:
-      - "8501:8501"
+      - "127.0.0.1:8501:8501"  # like the API: it spends the model key and writes the brief
     restart: unless-stopped
     depends_on:
       ollama:
@@ -117,7 +117,7 @@ services:
     # what runs is exactly what is inside the image.
     volumes: []
     ports:
-      - "8501:8501"
+      - "127.0.0.1:8501:8501"  # like the API: it spends the model key and writes the brief
     restart: unless-stopped
 
   # Does this machine still work with the network unplugged? One-shot, and its

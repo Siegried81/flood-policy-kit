@@ -12,8 +12,8 @@ gets each of them wrong:
 
 They live here rather than in `app/streamlit_app.py` so a test can exercise them
 without executing the app: importing the script runs the whole page, which reads
-the real `data/processed/` tables - green on this machine and red on a runner
-that has no `data/`.
+the real `data/processed/` tables - green on a machine that has them and red
+on one that does not.
 """
 
 from __future__ import annotations
@@ -24,6 +24,18 @@ from pathlib import Path
 #: `[text](something.md)` and `[text](../docs/something.md#anchor)`, but never an
 #: `http(s)` target, which a reader with a network can follow.
 _RELATIVE_DOC_LINK = re.compile(r"\[([^\]]+)\]\((?!https?:)[^)]*\.md[^)]*\)")
+
+
+def table_row(cells: list[str]) -> str:
+    """One Markdown table row from free-text cells typed into the log form.
+
+    A `|` ends a cell and a newline ends the row, so either one typed into a
+    field ("Claude | Haiku") shifted every later field or broke the table. The
+    pipe is escaped and line breaks become spaces, so what was typed is what
+    the row shows.
+    """
+    cleaned = [" ".join(str(c).split()).replace("|", "\\|") for c in cells]
+    return "| " + " | ".join(cleaned) + " |\n"
 
 
 def append_row(path: Path, row: str) -> None:

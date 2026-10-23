@@ -232,3 +232,19 @@ def test_a_percentage_is_labelled_as_one():
     )
     assert "%" in svg
     assert "10.0%" in svg or "50.0%" in svg
+
+
+def test_the_map_carries_the_boundary_credit_inside_its_frame():
+    """The GISCO terms require "© EuroGeographics for the administrative
+    boundaries" on the map itself. Drawn into the SVG, so every map this module
+    makes carries it, and inside the viewBox, so it is not drawn and clipped."""
+    import re
+
+    features = [_square(f"R{i}", 4 + i, 50) for i in range(12)]
+    svg = svgmap.choropleth_svg(features, {f"R{i}": i / 100 for i in range(12)},
+                                extent_excludes=())
+    match = re.search(r'<text x="([\d.]+)" y="([\d.]+)"[^>]*>([^<]*EuroGeographics[^<]*)</text>', svg)
+    assert match, "no boundary credit on the map"
+    assert "© EuroGeographics for the administrative boundaries" in match.group(3)
+    x, y = float(match.group(1)), float(match.group(2))
+    assert 0 < x <= 900 and 0 < y <= min(y for _, y in _legend_rects(svg))

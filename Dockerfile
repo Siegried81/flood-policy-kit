@@ -22,7 +22,7 @@
 # (that base ships a system Python, so pip then needs
 # `--break-system-packages`; it is a fallback, not the tested path.)
 #
-# **Two stages, because the data is 3.82 GiB.** `app` holds the code only and
+# **Two stages, because the data is 6.4 GiB** (measured 2026-10-23). `app` holds the code only and
 # expects `data/` to be bind-mounted - that is the day-to-day image, rebuilt in
 # seconds. `portable` is `app` with the whole data tree copied in, which is the
 # image that fits on a USB stick and runs the demo on a machine that has never
@@ -72,7 +72,7 @@ RUN useradd --create-home --uid 10001 app \
 
 # Source, path by path rather than `COPY . .`: data/ has to stay in the build
 # context for the `portable` stage below, and a wholesale copy would then pull
-# 3.82 GiB into this stage too. Being explicit also means a new file at the repo
+# 6.4 GiB into this stage too. Being explicit also means a new file at the repo
 # root cannot silently end up in the image.
 COPY --chown=app:app src/ ./src/
 COPY --chown=app:app app/ ./app/
@@ -113,7 +113,7 @@ CMD ["python", "-m", "streamlit", "run", "app/streamlit_app.py", \
 # from the venue network and nothing from the Windows machine.
 #
 # It is the LAST stage deliberately, so the default `docker build .` is the image
-# that cannot fail for lack of data. It costs ~4 GiB and a long first build; the
+# that cannot fail for lack of data. It costs ~6.5 GiB and a long first build; the
 # alternative is a 2 GiB image plus a folder someone has to remember to copy, and
 # the folder is the half that gets forgotten.
 #

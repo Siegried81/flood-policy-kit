@@ -26,10 +26,10 @@ YAML, the YAML is right.
 ## What the whole download costs
 
 The `geodata` section declares **30 entries**, which expand to **52 jobs**; **38**
-of those are files to download (**≈5.05 GiB**, of which the Natura 2000 GeoPackage is 1.27) and the other **14** are
+of those are files to download (**≈5.52 GiB**, of which the Natura 2000 GeoPackage is 1.27) and the other **14** are
 `access: api` endpoints queried at runtime, so nothing lands on disk for them.
 With the `policy_corpus` (**24** entries) and `context` (**3**) sections, every one
-of them a `scrape`, the whole fetch is **65 files** and **≈5.09 GiB**, a floor: the
+of them a `scrape`, the whole fetch is **65 files** and **≈5.56 GiB**, a floor: the
 twelve policy documents declared on 2026-10-12 are not in the byte total, because
 most of their hosts send no `Content-Length`. **Four** entries resolve to several files
 each — `jrc_flood_hazard` 13 (nine return periods, two companion masks, the README

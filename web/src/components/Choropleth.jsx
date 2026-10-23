@@ -143,6 +143,8 @@ export default function Choropleth({ geojson, values, valueKey, idKey, label }) 
             Svalbard) are outside this frame; they are in every figure and in the table.
           </>
         )}
+        {/* Required by the GISCO terms on any map drawn from the NUTS boundaries. */}
+        <span className="credit"> © EuroGeographics for the administrative boundaries.</span>
       </figcaption>
     </figure>
   );
