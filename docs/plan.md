@@ -1,4 +1,4 @@
-# Preparation plan — 23 days
+et si on faisais aussi un power bi??# Preparation plan — 23 days
 
 **Today: Tuesday 6 October 2026. Day 1: Thursday 29 October, 09:00 at FARI.
 Day 2: Friday 30 October, until 18:00 at JRC.**

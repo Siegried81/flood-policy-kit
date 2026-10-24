@@ -39,3 +39,18 @@ _build/
 # frozen table at one return period, never a source: `data/processed/` holds the
 # tables and `config/sources.yaml` the inputs.
 *_export.csv
+
+# Key files dropped in the repo by hand must never reach git: a CLMS service
+# key (JSON with a private key) sat untracked at the root on 2026-10-24.
+key_*
+*service_key*.json
+*.pem
+.cdsapirc
+
+# Power BI: the CSVs are regenerated from the frozen tables by
+# scripts/export_bi.py, and the TopoJSON is a copy of GISCO geometry (see
+# data/processed/DATA_NOTICE.md). Desktop's local cache and settings stay local.
+bi/data/
+**/.pbi/localSettings.json
+**/.pbi/cache.abf
+*.pbix

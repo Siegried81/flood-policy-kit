@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import zipfile
 from pathlib import Path
 
 import geopandas as gpd
@@ -54,14 +55,44 @@ from scripts.build_exposure import (  # noqa: E402
     DEFAULT_STRIPES,
     HAZARD_DIR,
     PERMANENT_WATER,
+    PROTECTED_OUT,
     SPURIOUS_AREAS,
     _exposure_one_period,
     boundaries,
     hazard_paths,
+    protection_path,
+    total_population,
 )
-from src import apsfr, assets, basins, climate, demographics, environment  # noqa: E402
+from src import (  # noqa: E402
+    apsfr, assets, basins, climate, demographics, efas, environment, facilities,
+    hera, pluvial, sealing,
+)
 
 OUT = ROOT / "data" / "processed" / "context.parquet"
+DOWNLOAD = ROOT / "data" / "raw" / "download"
+
+#: The return periods the facility counts are given at: frequent, the planning
+#: standard, and the extreme. Three, not nine - each is a column per facility
+#: type and per reading (undefended, residual).
+FACILITY_RETURN_PERIODS = (10, 100, 500)
+
+#: Layers `--only` can recompute into an existing table without the rest.
+LAYERS = (
+    "residual", "facilities", "epoch2010", "sealing", "imperviousness",
+    "pluvial", "flood_recurrence", "efas2021", "hera_trend",
+)
+
+#: The optional layers below, each `(name, function)` returning `(frame, note)`
+#: or `(None, reason)`. Every one of them reads files a human fetched on purpose
+#: (an account, a 69 GB download), so a missing input is a note, never a crash.
+OPTIONAL_LAYERS = {
+    "sealing": lambda admin: sealing.hera_by_region(admin),
+    "imperviousness": lambda admin: sealing.clms_by_region(admin),
+    "pluvial": lambda admin: pluvial.by_region(admin),
+    "flood_recurrence": lambda admin: pluvial.flood_recurrence_by_region(admin),
+    "efas2021": lambda admin: efas.by_region(admin),
+    "hera_trend": lambda admin: hera.by_region(admin, build=False),
+}
 CLIMATE_DIR = ROOT / "data" / "raw" / "download" / "cds_hydrology_projections"
 
 #: The return period the built-up figures are measured at. 100 years because it
@@ -181,6 +212,167 @@ def _climate(admin: gpd.GeoDataFrame, variable: str, period: str):
     return frame, f"{len(members)} member(s) for {period}"
 
 
+def _zip_tif(path: Path) -> str:
+    """A GDAL `zip://` URI for the single GeoTIFF inside a GHSL archive."""
+    with zipfile.ZipFile(path) as archive:
+        tifs = [n for n in archive.namelist() if n.lower().endswith(".tif")]
+    if len(tifs) != 1:
+        raise SystemExit(f"Expected exactly one .tif in {path.name}, found {tifs}")
+    return f"zip://{path.as_posix()}!/{tifs[0]}"
+
+
+def _residual(admin: gpd.GeoDataFrame, key: str):
+    """Residual exposure per return period, or a reason it is absent.
+
+    Read from `exposure_protected.parquet`, which `build_exposure.py
+    --protection` writes with the same windows, masks and threshold as the
+    exposure table - so `residual_exposed_pop_rp100` and the exposure table's
+    RP100 `exposed_pop` differ by the people the defences hold and by nothing
+    else. Kept here rather than in the exposure table because a second
+    headcount there would be scanned into the vulnerability index.
+    """
+    if not PROTECTED_OUT.exists():
+        return None, (
+            f"{_shown(PROTECTED_OUT)} is absent - run "
+            "scripts/build_exposure.py --protection first"
+        )
+    protected = pd.read_parquet(PROTECTED_OUT)
+    wide = protected.pivot(index=key, columns="return_period", values="exposed_pop")
+    wide.columns = [f"residual_exposed_pop_rp{rp}" for rp in wide.columns]
+    frame = wide.reindex(admin[key].values)
+    frame.index = admin.index
+    return frame, f"{len(wide.columns)} return periods from {_shown(PROTECTED_OUT)}"
+
+
+def _facilities(admin: gpd.GeoDataFrame, min_depth_m: float):
+    """Hospitals and schools in the flood footprint, or a reason they are absent.
+
+    Same depth threshold and masks as every other figure here, at
+    `FACILITY_RETURN_PERIODS`, undefended and residual. A region in a country
+    the GISCO layer does not cover reads 0 - the layer's coverage is in its
+    metadata, and `config/sources.yaml` says the definitions vary by country.
+    """
+    periods = hazard_paths()
+    masks = [str(HAZARD_DIR / PERMANENT_WATER), str(HAZARD_DIR / SPURIOUS_AREAS)]
+    try:
+        protection = protection_path()
+    except SystemExit:
+        protection = None
+    frames, notes = [], []
+    for source_id, prefix, weight in (
+        ("gisco_healthcare", "hospitals", "cap_beds"),
+        ("gisco_education", "schools", None),
+    ):
+        path = DOWNLOAD / f"{source_id}.gpkg"
+        if not path.exists():
+            notes.append(f"{prefix}: {path.name} absent")
+            continue
+        points = facilities.load(path)
+        flags = {}
+        for rp in FACILITY_RETURN_PERIODS:
+            if rp not in periods:
+                continue
+            wet = facilities.flooded(points, periods[rp], min_depth_m=min_depth_m, masks=masks)
+            flags[f"flooded_rp{rp}"] = wet
+            if protection is not None:
+                flags[f"flooded_residual_rp{rp}"] = wet & ~facilities.held(points, protection, rp)
+        frames.append(facilities.counts_by_region(points, admin, flags, prefix=prefix, weight=weight))
+        notes.append(f"{prefix}: {len(points):,} points")
+    if not frames:
+        return None, "; ".join(notes)
+    return pd.concat(frames, axis=1), "; ".join(notes)
+
+
+def _epoch_2010(admin: gpd.GeoDataFrame, return_period: int, min_depth_m: float,
+                stripes: int):
+    """People and built-up surface in the footprint in 2010, or a reason not.
+
+    The same function, windows, masks and threshold as the 2025 figures, with
+    the 2010 GHSL epochs in the population slot - the only thing that changes
+    between the two readings is the year of the grid, so the difference is the
+    change in what stands in the floodplain, not in how it was measured. The
+    footprint itself is today's hazard map in both readings.
+    """
+    pop_zip = DOWNLOAD / "ghsl_pop_europe_2010.zip"
+    built_zip = DOWNLOAD / "ghsl_built_europe_2010.zip"
+    missing = [p.name for p in (pop_zip, built_zip) if not p.exists()]
+    if missing:
+        return None, f"{', '.join(missing)} absent"
+    periods = hazard_paths()
+    if return_period not in periods:
+        return None, f"no hazard raster for RP{return_period}"
+    masks = [PERMANENT_WATER, SPURIOUS_AREAS]
+    pop_path, built_path = _zip_tif(pop_zip), _zip_tif(built_zip)
+    people = _exposure_one_period(
+        periods[return_period], pop_path, admin, stripes=stripes,
+        min_depth_m=min_depth_m, mode="fraction", masks=masks,
+    )
+    built = _exposure_one_period(
+        periods[return_period], built_path, admin, stripes=stripes,
+        min_depth_m=min_depth_m, mode="fraction", masks=masks,
+    )
+    frame = pd.DataFrame(
+        {
+            f"exposed_pop_2010_rp{return_period}": pd.to_numeric(people["exposed_pop"], errors="coerce"),
+            "pop_total_2010": total_population(pop_path, admin).values,
+            f"exposed_built_m2_2010_rp{return_period}": pd.to_numeric(built["exposed_pop"], errors="coerce"),
+            "built_total_m2_2010": pd.to_numeric(
+                assets.total_built_surface(built_path, admin), errors="coerce"
+            ),
+        },
+        index=admin.index,
+    )
+    return frame, f"GHSL 2010 epoch at RP{return_period}"
+
+
+def _new_layers(admin, key, args, only):
+    """The layers `--only` can name, computed in a fixed order; (frames, notes)."""
+    frames, notes = [], []
+    if "residual" in only:
+        frame, why = _residual(admin, key)
+        notes.append(f"residual: {'SKIPPED - ' if frame is None else ''}{why}")
+        frames.append(frame)
+    if "facilities" in only:
+        frame, why = _facilities(admin, args.min_depth_m)
+        notes.append(f"facilities: {'SKIPPED - ' if frame is None else ''}{why}")
+        frames.append(frame)
+    if "epoch2010" in only:
+        frame, why = _epoch_2010(admin, args.return_period, args.min_depth_m, args.stripes)
+        notes.append(f"2010 epoch: {'SKIPPED - ' if frame is None else ''}{why}")
+        frames.append(frame)
+    for name, layer in OPTIONAL_LAYERS.items():
+        if name in only:
+            frame, why = layer(admin)
+            notes.append(f"{name}: {'SKIPPED - ' if frame is None else ''}{why}")
+            frames.append(frame)
+    return [f for f in frames if f is not None], notes
+
+
+def _update(admin, key, args) -> int:
+    """`--only`: recompute the named layers into the existing table.
+
+    The full build is an afternoon of rasters and services; adding hospitals
+    should not mean re-reading the climate ensemble. Every column the named
+    layers produce is replaced, every other column is kept byte for byte.
+    """
+    if not args.out.exists():
+        raise SystemExit(f"{_shown(args.out)} does not exist; run the full build first.")
+    table = pd.read_parquet(args.out)
+    if list(table[key]) != list(admin[key]):
+        raise SystemExit(f"{_shown(args.out)} rows are not in boundary order; run the full build.")
+    table.index = admin.index
+    frames, notes = _new_layers(admin, key, args, args.only)
+    for frame in frames:
+        table = table.drop(columns=[c for c in frame.columns if c in table.columns]).join(frame)
+    partial = args.out.with_suffix(".parquet.part")
+    table.to_parquet(partial, index=False)
+    partial.replace(args.out)
+    print(f"{len(table)} rows -> {_shown(args.out)}, {len(table.columns)} columns (updated: {', '.join(args.only)})")
+    for note in notes:
+        print(f"  {note}")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -210,11 +402,18 @@ def main() -> int:
              f"{DEFAULT_STRIPES}). Memory only; the result does not depend on it.",
     )
     parser.add_argument("--out", type=Path, default=OUT)
+    parser.add_argument(
+        "--only", action="append", choices=LAYERS,
+        help="Recompute only this layer into the existing table, keeping every "
+             "other column. Repeatable.",
+    )
     args = parser.parse_args()
 
     admin = boundaries()
     # `boundaries()` renames GISCO's fields to `nuts_id`, `region`, `country`.
     key = "nuts_id"
+    if args.only:
+        return _update(admin, key, args)
     table = pd.DataFrame({key: admin[key].values}, index=admin.index)
     notes: list[str] = []
 
@@ -323,6 +522,11 @@ def main() -> int:
         else:
             table = table.join(frame)
             notes.append(f"climate {period}: {why}")
+
+    frames, layer_notes = _new_layers(admin, key, args, LAYERS)
+    for frame in frames:
+        table = table.join(frame)
+    notes.extend(layer_notes)
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     table.to_parquet(args.out, index=False)

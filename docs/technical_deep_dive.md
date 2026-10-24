@@ -6,7 +6,7 @@ three minutes are up, and the questions you will ask yourself at 02:00 when a
 number looks wrong.
 
 Everything here is re-derived from the code and the config as they stand on
-6 October 2026. Where a figure comes from a measurement rather than from the
+24 October 2026. Where a figure comes from a measurement rather than from the
 repository, it says so. `docs/decisions.md` carries the dated record of every
 change to what a number means; this file describes the current state only.
 
@@ -20,28 +20,30 @@ config/sources.yaml          one file owns every URL
         ▼
 python -m src.fetch          65 files, ≈5.56 GiB, idempotent, robots-aware
         │
-        ├───────────────┬──────────────┐
-        ▼               ▼              ▼
-build_exposure.py  build_context.py  build_geometry.py
- hazard ×           built-up, Natura,  boundaries →
- population         basins, future     simplified polygons
- per NUTS3 × RP     discharge, GDP,
- + Eurostat         density, income,
-                    per NUTS3
-   indicators
-        │               │              │
-        ▼               ▼              ▼
-exposure.parquet   context.parquet   regions.geojson
-        │               │              │
-        └───────────────┴──────┬───────┘
-                               ▼
-                 api/main.py           12 JSON routes over src/
-                       │
-        ┌──────────────┴──────────────┐
-        ▼                             ▼
-   web/ (React)              app/streamlit_app.py
-   5 tabs, SVG choropleth     7 tabs, SVG choropleth, reads
-                              the parquets directly, no build step
+        ├───────────────────────┬───────────────────────┐
+        ▼                       ▼                       ▼
+build_exposure.py          build_context.py          build_geometry.py
+ hazard × population        built-up, Natura,         boundaries →
+ per NUTS3 × RP             basins, future            simplified polygons
+ + Eurostat indicators      discharge, declared
+ --protection: the same     areas, GDP, density,
+ pass behind the JRC        income, residual
+ protection standards       exposure, hospitals and
+        │                   schools, the 2010 epoch
+        ▼                       │                       │
+exposure.parquet                ▼                       ▼
+exposure_protected.parquet  context.parquet         regions.geojson
+        │                       │                       │
+        └───────────────────────┼───────────────────────┘
+                                ▼
+                  api/main.py             12 JSON routes over src/
+                        │
+        ┌───────────────┼──────────────────────────┐
+        ▼               ▼                          ▼
+   web/ (React)    app/streamlit_app.py      scripts/export_bi.py
+   5 tabs, SVG     7 tabs, reads the          → bi/data/*.csv
+   choropleth      parquets directly          → bi/FloodPolicyKit.pbip
+                                                (Power BI, docs/power_bi.md)
 ```
 
 Two properties of this shape are deliberate.
@@ -216,9 +218,45 @@ by default:
 `--min-depth-m` defaults to **0.5 m**, the usual threshold for damage to
 buildings. Pass `0` for the any-water upper bound, and say which you used.
 
+### 3.6 Undefended and residual: the dykes the maps leave out
+
+The JRC maps "do not account for the influence of local flood defences, in
+particular dyke systems" (Dottori et al. 2022, in the corpus as
+`jrc_hazard_maps_validation_essd_2022`). Every figure in `exposure.parquet` is
+therefore **undefended**: the people the water reaches if no defence holds.
+The JRC's own headline - about 160,000 people exposed each year in the EU+UK -
+is defended and probability-weighted, which is why the two differ by two
+orders of magnitude.
+
+`build_exposure.py --protection` reruns the same pass behind the PESETA IV
+flood protection standards (`jrc_flood_protection_standards`, 500 m, EPSG:3035,
+design return periods 2 to 10,000). In every hazard window, each cell whose
+standard is at least the scenario's return period is set to the hazard's
+nodata, which this layer reads as dry: observed, nobody exposed. Three choices
+decide what the residual figure means:
+
+- **Nearest neighbour, never an average.** A standard is a property of a
+  place; averaging a 1-in-50 cell with a 1-in-1,000 one invents a dyke nobody
+  built. `protected_cells` reprojects the 500 m standards onto the ~90 m hazard
+  window with `Resampling.nearest`.
+- **Unknown is unprotected.** A cell with no standard (nodata -1, or outside
+  the raster) is never masked, so where the standards are silent the residual
+  figure stays at the undefended one - an upper bound, not a guess.
+- **Never over the undefended table.** The parts are parked as
+  `rp*_..._m2_prot.parquet` and the table is written to
+  `exposure_protected.parquet`; `build_context.py` carries it into
+  `context.parquet` as `residual_exposed_pop_rp*`. A second headcount in
+  `exposure.parquet` would be scanned into the vulnerability index (§4.3).
+
+The value 10,000 is real, not a fill: all 22,572 such cells are in the
+Netherlands, whose coastal dyke rings are built for it. The standards date from
+2019 and were derived for an older generation of the hazard maps than v3.1.1;
+quote the residual figure as "behind the design standards", never as "after
+protection".
+
 ---
 
-## 4. The two derived files, and the UI contract
+## 4. The derived files, and the UI contract
 
 ### 4.1 `exposure.parquet`
 
@@ -251,7 +289,33 @@ Two choices are load-bearing and both fail silently if got wrong:
   twice over: the missing regions, and the colour of every other one, because the
   legend's classes are quantiles over whatever is present.
 
-### 4.3 The twelve routes
+### 4.3 `context.parquet`, and the layers that can be rebuilt alone
+
+One row per region, everything `exposure.parquet` must not hold: a numeric
+column there is picked up by `api/main.py::vulnerability_indicators` and enters
+a min-max-scaled weighted mean. Three layers were added on 24 October 2026:
+
+- **Residual exposure** - `residual_exposed_pop_rp*`, read from
+  `exposure_protected.parquet` (§3.6). A region missing from that run reads
+  NaN, never 0: 0 would say the defences hold everyone there.
+- **Hospitals and schools** - `src/facilities.py` reads each GISCO point at its
+  own location in the RP10, RP100 and RP500 rasters, with the same 0.5 m
+  threshold and the same two masks as the people count, undefended and behind
+  the protection standards (`hospitals_flooded_rp100`,
+  `schools_flooded_residual_rp100`, ...). **A country the layer does not cover
+  is NaN, not 0**: GISCO holds no German hospital, and a 0 there read as a
+  measured all-clear for the most populous Member State. The same rule applies
+  to hospital beds, which most countries do not report.
+- **The 2010 epoch** - `exposed_pop_2010_rp100` and
+  `exposed_built_m2_2010_rp100` with their totals: today's footprint over the
+  2010 GHSL grids, through the same `_exposure_one_period` as the 2025 figures,
+  so the difference is what moved into the floodplain, not how it was counted.
+
+`build_context.py --only residual|facilities|epoch2010` recomputes one of these
+into the existing table and keeps every other column byte for byte. It refuses
+a table whose rows are not in boundary order, because the join is positional.
+
+### 4.4 The twelve routes
 
 `/api/health`, `/api/meta`, `/api/exposure`, `/api/context`, `/api/geometry`,
 `/api/vulnerability`, `/api/search`, `/api/draft`, `/api/languages`,
@@ -346,8 +410,8 @@ down in advance.
 
 ## 7. The test suite
 
-**<!-- numbers:tests_collected -->760<!-- /numbers --> tests, offline**: no network, no model, no key. Measured 12 October 2026 in
-WSL2: all <!-- numbers:tests_collected -->760<!-- /numbers --> collect and pass, nothing deselected; the same day Windows
+**<!-- numbers:tests_collected -->861<!-- /numbers --> tests, offline**: no network, no model, no key. Measured 12 October 2026 in
+WSL2: all <!-- numbers:tests_collected -->861<!-- /numbers --> collect and pass, nothing deselected; the same day Windows
 blocked `rasterio` again. Re-run on 14 October 2026: still blocked on Windows
 (the five raster modules, 59 tests, do not collect), and in WSL2 all 702 pass
 once `test_climate.py`'s dry-run test stopped reading the CDS files already in
@@ -368,9 +432,9 @@ block that `scripts/docs_numbers.py --write` fills from `pytest --collect-only`,
 and `tests/test_docs_numbers.py` fails the suite when any marked block in the
 docs disagrees with the repository. Edit the prose, never the digit.
 
-Per-file counts measured 23 October 2026 with
+Per-file counts measured 24 October 2026 with
 `pytest --collect-only -q | grep '::' | cut -d: -f1 | sort | uniq -c`; they sum to the
-marked total above. Twenty-nine files — an earlier table listed twenty-two and
+marked total above. Thirty-one files — an earlier table listed twenty-two and
 summed to 473, a figure that had survived three suite changes by being typed.
 
 | File | Tests | Guards |
@@ -379,7 +443,7 @@ summed to 473, a figure that had survived three suite changes by being typed.
 | `test_offline_readiness.py` | 56 | the demo runs with the Wi-Fi off: the three verdicts, `--strict`, a rejected file is not present, the two caches `src.fetch` does not fill |
 | `test_validate.py` | 50 | the scoring grid, the three metrics, `None` vs `0.0` |
 | `test_api.py` | 72 | the routes, the 404s that name their builder, the JSX guards, a table frozen before the units rename, the approve token and the bounds on `k` |
-| `test_streamlit_app.py` | 57 | the fallback UI, the translation and ask-the-table tabs, the climate and coverage caveats, the density, income and Natura 2000 sections, a rebuilt table replacing the cached one, a table frozen before the units rename |
+| `test_streamlit_app.py` | 58 | the fallback UI, a ranked chart ordered by its value, the translation and ask-the-table tabs, the climate and coverage caveats, the density, income and Natura 2000 sections, a rebuilt table replacing the cached one, a table frozen before the units rename |
 | `test_fetch.py` | 62 | robots, idempotency, a single declared source for the hosted app, multi-file expansion, a stale rejection page is quarantined, colliding paths are refused, the cited policy sources are declared and every corpus file lands in a format the index reads |
 | `test_rag.py` | 67 | cite-or-refuse, and a fence no spelling of the closing tag escapes |
 | `test_losses.py` | 29 | the RDH euro vintages and the levelling |
@@ -401,9 +465,21 @@ summed to 473, a figure that had survived three suite changes by being typed.
 | `test_assets.py` | 8 | the built-up surface: the archive, the unit, the share |
 | `test_docs_numbers.py` | 10 | a number typed in a doc that no longer matches the code fails the suite |
 | `test_legislation.py` | 7 | every legal citation has a CELEX and a URL, and `policy_answer.md` cites no article the registry lacks |
-| `test_build_context.py` | 2 | the context build does not fail after writing its table |
+| `test_build_context.py` | 6 | the context build does not fail after writing its table; residual columns per return period, NaN not 0; `--only` replaces one layer and keeps the rest; a reordered table is refused |
+| `test_protection.py` | 5 | the residual reading: held up to the design standard and not beyond, unknown is never protected, parked and written apart from the undefended table |
+| `test_facilities.py` | 5 | hospitals and schools: the 0.5 m threshold, the masks, unknown protection never holds, one region per facility, an uncovered country is not measured |
 | `test_build_geometry.py` | 9 | the join key, the projection, the simplification, the hosted app's download-and-build |
+| `test_export_bi.py` | 15 | the Power BI export and report: the EU-27 headline unchanged, the TMDL columns equal to the CSV, no sum across return periods, every field a PBIR file names exists in the model, every project JSON file valid against Microsoft's schema, the drill-down hierarchy and the drillthrough binding |
 | `test_data_io.py` | 3 | the CRS engine is alive |
+
+**Screenshots are a script, not a chore.**
+`scripts/screenshots/take_screenshots.ps1` starts Streamlit, the API and the
+React dev server on their own ports (8599, 8099, 5199, so a demo already
+running is never touched), drives every tab of both UIs with Playwright in
+headless Chromium, writes `docs/screenshots/*.png` and stops what it started -
+about two minutes. Headless because it is reproducible: re-run it after any
+change to the UI instead of re-taking screenshots by hand. Draft, Ask and
+Translate are captured empty on purpose, since filling them calls a model.
 
 `test_data_io.py` earns its three tests: a dead `pyproj` is the silent failure in
 this stack. `geopandas` still imports, `GeoDataFrame(..., crs=...)` still returns
@@ -417,9 +493,9 @@ zonal statistic is the right arithmetic on the wrong piece of Europe. Measured o
 
 | Claim | Source |
 |---|---|
-| <!-- numbers:tests_collected -->760<!-- /numbers --> tests | `scripts/docs_numbers.py --write`, which runs `pytest --collect-only` and rewrites the marked blocks; the per-file counts are typed by hand |
+| <!-- numbers:tests_collected -->861<!-- /numbers --> tests | `scripts/docs_numbers.py --write`, which runs `pytest --collect-only` and rewrites the marked blocks; the per-file counts are typed by hand |
 | 65 files, ≈5.56 GiB | `src.fetch.expand()` over `config/sources.yaml`; the bytes measured on disk on 23 October, all 65 files present |
-| <!-- numbers:sources_declared -->57<!-- /numbers --> declared inputs, <!-- numbers:sources_verified -->49<!-- /numbers --> with a verification date, <!-- numbers:sources_licensed -->20<!-- /numbers --> with an explicit `licence:` | `scripts/docs_numbers.py` over `config/sources.yaml`: entries with an `id`; `verified` not null; `licence` non-empty |
+| <!-- numbers:sources_declared -->73<!-- /numbers --> declared inputs, <!-- numbers:sources_verified -->65<!-- /numbers --> with a verification date, <!-- numbers:sources_licensed -->33<!-- /numbers --> with an explicit `licence:` | `scripts/docs_numbers.py` over `config/sources.yaml`: entries with an `id`; `verified` not null; `licence` non-empty |
 | 1,345 NUTS3 polygons | the GISCO NUTS 2024 file itself |
 | the 0.25% stripe discrepancy | two continental RP100 builds, 6 October 2026 |
 | 4.85% of cells carry a value | a 1,468,800-cell window of Belgian land, RP100 |

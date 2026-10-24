@@ -89,6 +89,7 @@ from urllib.parse import urlparse
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.data_io import DATA, sources  # noqa: E402
+from src import fetch  # noqa: E402
 from src.fetch import expand, target_of, why_not_a_document_on_disk  # noqa: E402
 from src.rdh import CACHE_DIR as RDH_CACHE_DIR  # noqa: E402
 from src.rdh import COLLECTIONS as RDH_COLLECTIONS  # noqa: E402
@@ -151,8 +152,12 @@ def _human(size: int) -> str:
 def declared_targets(data_dir: Path = DATA) -> list[tuple[str, str, Path]]:
     """Every file a complete `src.fetch` run would leave on disk: (id, access, path).
 
-    `api` entries are skipped for the same reason `fetch_all` skips them: a query
-    endpoint is called at run time with parameters, not mirrored wholesale.
+    `api` and `folder` entries are skipped for the same reason `fetch_all` skips
+    them, read off the fetcher's own `_NOT_MIRRORED` rather than restated here: a
+    query endpoint is called at run time with parameters, and a `folder` is
+    declared for provenance or fetched on purpose by its own script (the 69 GB
+    of HERA discharge). Restating the set let the two drift: the first `folder`
+    entry that listed files made this check demand them.
     Multi-file entries go through `fetch.expand`, so the count is files and not
     declared sources.
 
@@ -164,7 +169,7 @@ def declared_targets(data_dir: Path = DATA) -> list[tuple[str, str, Path]]:
     for section in ("geodata", "policy_corpus", "context"):
         for entry in sources(section) or []:
             access = entry.get("access", "download")
-            if access == "api":
+            if access in fetch._NOT_MIRRORED:
                 continue
             for job in expand(entry):
                 path = target_of(job, access)

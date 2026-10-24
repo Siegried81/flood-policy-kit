@@ -38,9 +38,16 @@ and master's students of Belgian universities, *hautes ecoles* and *hogescholen*
 (and, where relevant, other European institutions — secondary pupils too). The
 page welcomes AI, data science, engineering, environmental science, political
 science, communication and journalism. Prizes to the top three; first prize
-includes an internship and a trip to the JRC site at Ispra. The page contradicts
-itself on whether registration is open or opens "prochainement" — so write to
-info@fari.brussels rather than infer.
+includes an internship and a trip to the JRC site at Ispra.
+
+The organisers' practical information (PDF and e-mail of 12 October 2026)
+confirms the shape and names the final submission, due on the afternoon of
+30 October: **the 2-page policy brief, the visual outputs, and an AI usage
+summary** (`docs/ai_usage_log.md`). The e-mail calls the second output a
+**"policy tool"**, so the Streamlit and React apps are a deliverable, not a
+demo aid. Second prize is an AI Blindspots workshop, third Bozar tickets. The
+datasets come from the JRC and Copernicus, with access and AI licences sent a
+couple of days before: check them against `config/sources.yaml` that evening.
 
 ## 2. What we answer, in one line
 
@@ -310,7 +317,7 @@ this page adds is the current legislative context a JRC jury will know:
   `poverty_rate_pct` is a percentage beside `share_over_65`, a fraction. Values
   did not change; a table or export from an older build says `poverty_rate`,
   and the API and both UIs read it under the new name for one release.
-- Measured 2026-10-12: the full suite is **<!-- numbers:tests_collected -->760<!-- /numbers --> tests, all passing
+- Measured 2026-10-12: the full suite is **<!-- numbers:tests_collected -->861<!-- /numbers --> tests, all passing
   in WSL2 with nothing deselected**; re-run on 2026-10-14, all
   702 pass again once the climate dry-run test stopped reading the CDS files
   already in `data/`. Smart App Control blocked `rasterio` on

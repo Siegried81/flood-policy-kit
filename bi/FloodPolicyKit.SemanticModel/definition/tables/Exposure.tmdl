@@ -1,0 +1,160 @@
+table Exposure
+	lineageTag: 6ca30e39-a692-58c5-b089-de198a9f800e
+
+	/// People in the flood footprint for ONE return period: the one selected, or RP100 when none is. Blank when several are selected: the extents are nested, so a sum across return periods counts the same people several times.
+	measure 'Exposed population' = IF(HASONEVALUE(Exposure[return_period]) || NOT ISFILTERED(Exposure[return_period]), CALCULATE(SUM(Exposure[exposed_pop]), Exposure[return_period] = SELECTEDVALUE(Exposure[return_period], 100)))
+		formatString: #,0
+		lineageTag: b62bfbd2-0552-5a19-99ec-657dce73ef52
+
+	/// Residents of the regions in the current filter.
+	measure 'Population' = SUM(Regions[total_pop])
+		formatString: #,0
+		lineageTag: 040064c9-3f83-536e-8326-29dcef4cbfdd
+
+	/// Exposed population over residents, for one return period.
+	measure 'Share exposed' = DIVIDE([Exposed population], [Population])
+		formatString: 0.00%
+		lineageTag: 860e1af2-5030-5631-8620-c5af90f6a63f
+
+	/// Exposed population of regions with any area in a basin that crosses a national border. A floor: non-EU states do not report basins.
+	measure 'Exposed in shared basins' = CALCULATE([Exposed population], Regions[shared_basin_share] > 0)
+		formatString: #,0
+		lineageTag: 5c773aed-120a-51ee-aed4-64e12121d9d5
+
+	/// Share of the exposed population living in a cross-border basin.
+	measure 'Share in shared basins' = DIVIDE([Exposed in shared basins], [Exposed population])
+		formatString: 0.0%
+		lineageTag: ab016cb2-1e5b-58bd-854f-91b28193109d
+
+	/// Probability-weighted exposure over the sampled band (RP10-RP500 only): a lower bound, not an expected annual damage.
+	measure 'Expected annual exposure' = SUM(Regions[expected_annual_exposure])
+		formatString: #,0
+		lineageTag: 48791fd5-32c4-5da6-91b2-9106b93244bc
+
+	/// Regions intersecting a Floods Directive Art. 5 area. Declarations follow national geometry conventions and are not comparable across countries.
+	measure 'Regions with a declared risk area' = CALCULATE(COUNTROWS(Regions), Regions[apsfr_declared] = TRUE())
+		formatString: #,0
+		lineageTag: 59e6c272-5360-55be-a815-fbfe708865ab
+
+	/// Median over regions of the ensemble-median change in reference discharge, in %. Medians only: a mean is meaningless against near-zero references.
+	measure 'Median change in discharge 2041-2070' = MEDIAN(Regions[change_pct_ensemble_median_2041_2070])
+		formatString: 0.0
+		lineageTag: 8f35a325-54e0-52fa-82c9-b2585be62fa2
+
+	/// The return period on screen (RP100 when none is selected), for titles.
+	measure 'Selected return period' = SELECTEDVALUE(Exposure[return_period], 100)
+		formatString: 0
+		lineageTag: 91b39ad9-5899-51e6-88c5-bc942f866ab5
+
+	/// The return period on screen as words, for cards and titles. Says so when several are selected, since every headcount is then blank.
+	measure 'Return period label' = IF(HASONEVALUE(Exposure[return_period]) || NOT ISFILTERED(Exposure[return_period]), "1-in-" & FORMAT(SELECTEDVALUE(Exposure[return_period], 100), "0") & "-year river flood", "Pick one return period")
+		lineageTag: d536590d-d0ae-5a30-b5fa-fabbd9130c2e
+
+	/// NUTS3 regions in the current filter. Every region has an exposure figure for each of the nine return periods.
+	measure 'Regions measured' = COUNTROWS(Regions)
+		formatString: #,0
+		lineageTag: 40de1451-099b-5934-afdf-8eeb259cb336
+
+	/// Regions with any area in a basin that crosses a national border. A floor, like the headcount: non-EU states do not report basins.
+	measure 'Regions in shared basins' = CALCULATE(COUNTROWS(Regions), Regions[shared_basin_share] > 0)
+		formatString: #,0
+		lineageTag: 22f5530b-7c00-5901-8cbc-c71e4911a2b0
+
+	/// Residents aged 65 or over, as a share of all residents of the regions in the filter: weighted by population, so a country reads as its people and not as the mean of its regions. Regions without the figure are left out of both sides. A REGIONAL share: it says nothing about the age of the people inside the footprint.
+	measure 'Share over 65' = DIVIDE(SUMX(FILTER(Regions, NOT ISBLANK(Regions[share_over_65])), Regions[total_pop] * Regions[share_over_65]), SUMX(FILTER(Regions, NOT ISBLANK(Regions[share_over_65])), Regions[total_pop]))
+		formatString: 0.0%
+		lineageTag: 4f960ba9-56ef-5b04-b114-4121f5e40b5f
+
+	/// At-risk-of-poverty rate of the regions in the filter, weighted by population (poverty_rate_pct is in percent, hence the division by 100). Regions without the figure are left out of both sides. A regional rate, not the rate among the exposed.
+	measure 'Poverty rate' = DIVIDE(SUMX(FILTER(Regions, NOT ISBLANK(Regions[poverty_rate_pct])), Regions[total_pop] * Regions[poverty_rate_pct]), SUMX(FILTER(Regions, NOT ISBLANK(Regions[poverty_rate_pct])), Regions[total_pop])) / 100
+		formatString: 0.0%
+		lineageTag: cb6dcd29-eeb8-5bff-8847-3eafeb28b2a1
+
+	/// Share of ONE region's area inside a declared Floods Directive Art. 5 area; blank above one region, because the export carries no region areas to weight a sum with. Not comparable across countries.
+	measure 'Declared share of area' = IF(HASONEVALUE(Regions[nuts_id]), SELECTEDVALUE(Regions[apsfr_share]))
+		formatString: 0.0%
+		lineageTag: 09d6695c-29de-58eb-8124-f102a42889bf
+
+	/// The median region's declared share of area. Blank for a country that reports no declared areas (Ireland, Lithuania), which is not the same as zero. Not comparable across countries.
+	measure 'Median declared share' = MEDIAN(Regions[apsfr_share])
+		formatString: 0.0%
+		lineageTag: 53a71a2c-af01-5e7a-8663-c543dd19ee87
+
+	/// The region a drillthrough landed on. Two regions share a name (Jura, CH025 and FRC22): when the name alone was passed, the label says so, because the figures beside it then add both up.
+	measure 'Region shown' = IF(HASONEVALUE(Regions[nuts_id]), SELECTEDVALUE(Regions[region]) & " - " & SELECTEDVALUE(Regions[country_name]) & " (" & SELECTEDVALUE(Regions[nuts_id]) & ")", IF(HASONEVALUE(Regions[region]), SELECTEDVALUE(Regions[region]) & ": " & FORMAT(COUNTROWS(Regions), "0") & " regions share this name - the figures add them up", "No region picked: right-click a region on any page, then Drill through"))
+		lineageTag: 881fc7e1-c8f4-5707-9e93-67ce6a78aa9b
+
+	/// For one region, the ensemble's 25th percentile of the change in reference discharge, in %; over several, the median of those. Quartiles and medians only.
+	measure 'Lower quartile change in discharge 2041-2070' = MEDIAN(Regions[change_pct_ensemble_p25_2041_2070])
+		formatString: 0.0
+		lineageTag: be57f2a5-6443-5e77-948f-4fc884703b19
+
+	/// For one region, the ensemble's 75th percentile of the change in reference discharge, in %; over several, the median of those.
+	measure 'Upper quartile change in discharge 2041-2070' = MEDIAN(Regions[change_pct_ensemble_p75_2041_2070])
+		formatString: 0.0
+		lineageTag: c44ffa62-de3b-5eb5-8862-decdaeb6d31b
+
+	/// Regions where every simulation of the ensemble agrees on the direction of the change by 2041-2070.
+	measure 'Regions where simulations agree 2041-2070' = CALCULATE(COUNTROWS(Regions), Regions[ensemble_agrees_on_sign_2041_2070] = TRUE())
+		formatString: #,0
+		lineageTag: 396d90cd-1eee-57dd-8b1b-635fb6df4d80
+
+	/// Yes / No for one region (No data where the climate layer has no value); "n of m regions" above one region.
+	measure 'Simulations agree on direction 2041-2070' = IF(HASONEVALUE(Regions[nuts_id]), IF(ISBLANK(SELECTEDVALUE(Regions[change_pct_ensemble_median_2041_2070])), "No data", IF(SELECTEDVALUE(Regions[ensemble_agrees_on_sign_2041_2070]), "Yes", "No")), FORMAT([Regions where simulations agree 2041-2070], "0") & " of " & FORMAT(COUNTROWS(Regions), "0") & " regions")
+		lineageTag: 58b62ee3-bc09-54d6-8792-7b594f0224c1
+
+	column nuts_id
+		dataType: string
+		lineageTag: f7f5ca85-fb44-57e1-9c7b-9abd2423d469
+		summarizeBy: none
+		sourceColumn: nuts_id
+
+		annotation SummarizationSetBy = User
+
+	column return_period
+		dataType: int64
+		lineageTag: 645025b5-c2b5-52b1-8fe3-bb0a31c62c85
+		summarizeBy: none
+		sourceColumn: return_period
+
+		annotation SummarizationSetBy = User
+
+	column annual_probability
+		dataType: double
+		lineageTag: 2e52b840-d2a9-5ed5-93d9-084f5fe4942b
+		summarizeBy: none
+		sourceColumn: annual_probability
+
+		annotation SummarizationSetBy = User
+
+	column exposed_pop
+		dataType: double
+		lineageTag: 5342fd78-89d7-58fa-86a4-5a8bb7859787
+		summarizeBy: none
+		sourceColumn: exposed_pop
+
+		annotation SummarizationSetBy = User
+
+	column hazard_coverage
+		dataType: double
+		lineageTag: 81947da8-e0d8-53dd-97cd-b322c0c1c87d
+		summarizeBy: none
+		sourceColumn: hazard_coverage
+
+		annotation SummarizationSetBy = User
+
+	/// The countries a region shares its rivers with, shown on one region only (blank on a basin row).
+	measure 'Partner countries' = SELECTEDVALUE(Regions[shared_with])
+		lineageTag: 5e1d6c1a-7f0b-4c8e-9a51-2b7d3f4e6a90
+
+	partition Exposure = m
+		mode: import
+		source =
+				let
+				    Source = Csv.Document(File.Contents(DataFolder & "exposure.csv"), [Delimiter = ",", Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
+				    Promoted = Table.PromoteHeaders(Source, [PromoteAllScalars = true]),
+				    Typed = Table.TransformColumnTypes(Promoted, {{"nuts_id", type text}, {"return_period", Int64.Type}, {"annual_probability", type number}, {"exposed_pop", type number}, {"hazard_coverage", type number}}, "en-US")
+				in
+				    Typed
+
+	annotation PBI_ResultType = Table

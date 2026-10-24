@@ -35,6 +35,26 @@ has neither downloads that file from GISCO and builds it on first use.
   information 2026 (doi:10.24381/cds.73237ad6), CC BY 4.0. Neither the European
   Commission nor ECMWF is responsible for any use that may be made of the
   Copernicus information or data it contains.
+- **Flood protection standards** — JRC PESETA IV (Bianchi et al. 2022),
+  `floodProtection_v2019_paper`. © European Union, CC BY 4.0. Used to mask the
+  cells whose design standard holds a scenario (`residual_exposed_pop_rp*`).
+- **Population and built-up surface, 2010 epoch** — JRC GHSL GHS-POP and
+  GHS-BUILT-S E2010 R2023A. © European Union, CC BY 4.0.
+- **Hospitals and education sites** — Source: Eurostat - GISCO (healthcare
+  2023_v2025_11, education 2023_2026_01), from Member States' official
+  sources. GISCO terms of use; definitions vary by country. Only counts per
+  region are published here, never the points.
+- **EFAS reanalysis and return levels** — Contains modified Copernicus
+  Emergency Management Service information 2026 (EFAS historical v5.0,
+  doi:10.24381/cds.e3458969; v5.1 flood thresholds; LISFLOOD static maps).
+  CEMS-FLOODS licence. Not a flood warning.
+- **Sealed soil** — HERA sealed fraction (JRC / CEMS), © European Union,
+  CC BY 4.0.
+- **Heavy precipitation and flood recurrence** — Contains modified Copernicus
+  Climate Change Service information 2026 (European Climate Data Explorer,
+  sis-ecde-aggregated-climate-indicators, doi:10.24381/accabcec), CC BY 4.0.
+  Neither the European Commission nor ECMWF is responsible for any use that may
+  be made of the Copernicus information or data it contains.
 - **Demographic and economic indicators** — Source: Eurostat (demo_r_pjangrp3,
   ilc_li41, nama_10r_3gdp, accessed 2026-10-07; demo_r_d3dens, nama_10r_2hhinc,
   accessed 2026-10-12). Values were reshaped, and NUTS2 figures applied to their
