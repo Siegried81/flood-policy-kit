@@ -352,7 +352,11 @@ def _text_or_raise(content: object, provider: str) -> str:
 #:
 #: What it does NOT do is let a bigger prompt through: one request is still
 #: capped at 8,000 tokens whichever key carries it. See `_groq_once`.
-GROQ_KEY_VARS = ("GROQ_API_KEY", *(f"GROQ_API_KEY_{n}" for n in range(2, 6)))
+#:
+#: Up to nine names, not five: the list is a ceiling, and `groq_keys` keeps only
+#: the ones set. A sixth key existed and was silently never tried because the
+#: tuple stopped at `_5`.
+GROQ_KEY_VARS = ("GROQ_API_KEY", *(f"GROQ_API_KEY_{n}" for n in range(2, 10)))
 
 #: The local model when `OLLAMA_MODEL` is unset or blank: the one the demo laptop
 #: pulls. Named here so the offline-readiness check imports it rather than
@@ -428,7 +432,7 @@ def _rotates(exc: Exception) -> bool:
 def _groq(prompt: str, system: str) -> str:
     """One answer from Groq, trying each configured key in turn.
 
-    Five keys in five organisations give five per-minute budgets, which is the
+    N keys in N organisations give N per-minute budgets, which is the
     difference between a demo that survives a jury asking for three drafts in a
     row and one that does not. The rotation is deliberately narrow - see
     `_rotates` - because the failure that actually blocked this app was an

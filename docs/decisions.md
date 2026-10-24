@@ -2122,3 +2122,107 @@ evidence; the threshold should then be revisited, not kept by habit.
   were recomputed (`src.basins.shared_basin_exposure` on the cached WFD layer,
   99 s) and written back; every other column is byte-for-byte the 2026-10-12
   build. The previous file is kept as `context.parquet.backup-20261023`.
+
+## 2026-10-24 — residual exposure behind the flood defences, hospitals and schools
+
+- **The headcount is undefended, and now says so.** The JRC hazard maps "do
+  not account for the influence of local flood defences, in particular dyke
+  systems" (Dottori et al. 2022, now in the corpus). `exposure.parquet` is
+  unchanged; `build_exposure.py --protection` reruns the same pass with every
+  cell whose PESETA IV design standard holds the scenario set to dry, written
+  to `exposure_protected.parquet` and carried into `context.parquet` as
+  `residual_exposed_pop_rp*`. Measured on the EU-27 at RP100: 25,737,004
+  undefended, 7,252,724 residual (72 % held). Probability-weighted, the
+  residual is 207,308 people a year over the sampled band (271,083 closed to
+  p = 1), against the JRC's own "160,000 exposed annually" - same order, from
+  the opposite direction. Held share at RP100: NL 99 %, HU and AT 100 %, BE
+  100 %, DE 85 %, FR 87 %, IT 71 %, PL 26 %, RO 24 %, ES 12 %.
+- **Hospitals and schools in the footprint.** `src/facilities.py` reads each
+  GISCO point in the RP10/100/500 rasters, same 0.5 m threshold and masks,
+  undefended and residual. EU-27 at RP100: 355 hospitals (62 residual), 9,491
+  schools (2,849 residual). **Changed while building it:** a country the layer
+  does not cover reads NaN, not 0 - GISCO holds no German hospital, and the
+  first run reported Germany as a measured zero. Beds are kept only for the
+  countries that report them (a minority), and are not quoted.
+- **The shared-basin share in the brief was the 37-country figure.** 57.0 %
+  is the share over all 37 countries; beside the EU-27 headline it must be
+  63.3 % (16,278,961 of 25,737,004, 783 of 1,165 regions). Corrected in
+  `docs/brief_draft.md`; `policy_answer.md` quotes 57.0 % for the whole file,
+  which is right as stated.
+- **The Streamlit "Ranked" chart was not ranked.** `st.bar_chart` orders bars
+  by label unless told otherwise, so it ran alphabetically by NUTS code; and
+  the table under it was sorted by absolute count right below a caption saying
+  not to. Both now sort on the share; a test pins the chart's sort order.
+- **What changes in the numbers:** none of the frozen exposure figures. The
+  context table gains the residual, facility and 2010 columns.
+
+## 2026-10-24 (evening) — 2010 epoch, new Copernicus layers, and four repairs
+
+- **The 2010 epoch.** Today's RP100 footprint over the GHSL 2010 grids, through
+  the same pass as 2025. EU-27: built-up surface in the footprint 2,917 km2 in
+  2010 and 3,340 km2 in 2025 (+14.5 %, against +15.5 % everywhere); people in
+  it 25,126,201 and 25,737,004 (+2.4 %, against +1.6 % for all residents,
+  439,407,965 -> 446,267,469).
+- **Repaired: `total_population` cached one answer for every raster.** The cache
+  was a fixed `total_pop.parquet`, so the first 2010 run read the 2025 totals
+  back (446,267,469 residents in both years). It is now named after the raster
+  it summed; the 2025 file keeps its name. Test:
+  `test_total_population_is_cached_per_raster`.
+- **Repaired: facilities used `>=` 0.5 m where every other figure uses `>`.**
+  Now strict, so "flooded" means one thing across the context table; counts
+  recomputed.
+- **Repaired: the offline-readiness check restated the fetcher's skip list** and
+  demanded the 30 HERA files the moment a `folder` entry declared them. It now
+  reads `fetch._NOT_MIRRORED`.
+- **Repaired: the Groq rotation stopped at `GROQ_API_KEY_5`**, so a sixth key was
+  never tried. Up to `_9` now; `groq_keys` keeps the ones set.
+- **New layers, definitions that decide the numbers** (`src/efas.py`,
+  `src/hera.py`, `src/sealing.py`, `src/pluvial.py`, `src/activations.py`):
+  - EFAS river cells are cells with an upstream area >= 150 km2 (the floor of
+    the hazard maps and of EFAS's products). Measured on the real threshold
+    files: all 5,203,310 land cells carry a threshold and the 2-year flow is
+    under 1 m3/s on 73 % of them, so "has a threshold" is not "is a river".
+    Cells with equal thresholds at consecutive levels (3,825) are NaN.
+  - EFAS thresholds are fitted on 1992-2022, which contains 2021: a "1-in-N"
+    for July 2021 is measured against levels it helped set.
+  - HERA river cells: long-term mean discharge >= 1 m3/s; trends are Sen's
+    slope and Mann-Kendall at 5 %, per cell then the regional median.
+  - C3S ECDE precipitation indicators exist down to NUTS2 only (the form lists
+    NUTS3, the API rejects it): a NUTS3 region inherits its NUTS2 value and
+    `pluvial_level` says so. Flood recurrence is gridded only and reduced per
+    region by median. Ensemble quantiles (17/50/83), never the mean.
+  - Shares are fractions 0-1 and changes are percentage points.
+- **What changes in the numbers:** facility counts, by the strict threshold.
+  Nothing in `exposure.parquet`.
+## 2026-10-24 — the Power BI report becomes a six-page story in PBIR
+
+- **The report is rewritten in PBIR** (`bi/FloodPolicyKit.Report/definition/`,
+  one `visual.json` per visual) by `scripts/build_bi_report.py`, and every
+  JSON file of the project is validated offline against Microsoft's published
+  schemas, vendored in `bi/schemas/` (MIT), by `scripts/validate_bi_report.py`.
+  The legacy `report.json` is deleted and `definition.pbir` moves from version
+  1.0 (legacy layout only) to 4.0. The previous four pages were judged to tell
+  nothing and had no working drill-down; the new pages are listed in
+  `docs/power_bi.md`. Visuals are written at visualContainer 2.13.0, the
+  newest Microsoft publishes, although Desktop 2.159 saves 2.14.0.
+- **No existing measure changes meaning.** Twelve are added, and two of them
+  define how a figure is aggregated, so they are recorded here:
+  `Share over 65` and `Poverty rate` are **weighted by population** over the
+  regions in the filter, regions without the figure left out of both sides -
+  a country then reads as its people, not as the mean of its regions. A
+  "share of residents over 65 among the exposed" was asked for and **not
+  built**: it would assume the footprint has its region's age structure,
+  which the kit cannot check without a population grid by age.
+  `Declared share of area` is blank above one region, because the export
+  carries no region areas to weight a sum with.
+- **The drillthrough is bound to `Regions[region]`**, the field every story
+  visual shows. One name covers two regions, Jura (CH025, FRC22); the page then
+  adds both up, and `Region shown` says so rather than hiding it.
+- **Found, not fixed here:** `docs/brief_draft.md` (main checkout) writes
+  "25.7 million people in the EU-27 ... 57 % of them live in a river basin
+  shared with another country". Measured on the export at RP100, 57.0 % is the
+  share over all 37 countries (16.9 of 29.7 million); over the EU-27 it is
+  63.3 % (16.3 of 25.7 million). The Power BI page quotes the EU-27 figure.
+  The brief is a draft outside this branch, so the wording is left to its
+  owner.
+- Tests: 768 passed before; `tests/test_export_bi.py` goes from 8 to 15.

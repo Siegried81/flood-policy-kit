@@ -486,14 +486,23 @@ with map_tab:
 
     left, right = st.columns([2, 1])
     with left:
-        st.subheader(f"Ranked: exposed population, 1-in-{chosen} year flood")
         # Per inhabitant, not absolute: an absolute ranking just ranks by
         # population and tells a decision-maker nothing they did not know.
-        if "exposed_share" in shares.columns:
-            st.bar_chart(shares.nlargest(15, "exposed_share").set_index(key)["exposed_share"])
-            st.caption("Share of residents exposed. Ranking by absolute count would just rank by size.")
-        elif has_exposure:
-            st.bar_chart(shares.nlargest(15, "exposed_pop").set_index(key)["exposed_pop"])
+        # `sort` is passed explicitly: `st.bar_chart` otherwise orders the bars
+        # by their LABEL, so the "ranked" chart ran alphabetically from BG311
+        # to RS123 and the largest bar sat wherever its code fell.
+        ranked = "exposed_share" if "exposed_share" in shares.columns else "exposed_pop"
+        if has_exposure or ranked in shares.columns:
+            st.subheader(
+                f"Ranked: {'share of residents' if ranked == 'exposed_share' else 'people'} "
+                f"exposed, 1-in-{chosen} year flood"
+            )
+            st.bar_chart(
+                shares.nlargest(15, ranked)[[key, ranked]],
+                x=key, y=ranked, sort=f"-{ranked}",
+            )
+            if ranked == "exposed_share":
+                st.caption("Share of residents exposed. Ranking by absolute count would just rank by size.")
         else:
             st.warning("No `exposed_pop` column in the frozen table — nothing to chart.")
     with right:
@@ -512,8 +521,10 @@ with map_tab:
             help="Regions with no raster coverage — not zeros.",
         )
 
+    # Sorted on the chart's own measure, so the table under it does not rank
+    # by size right below a caption saying not to.
     st.dataframe(
-        shares.sort_values("exposed_pop", ascending=False) if has_exposure else shares,
+        shares.sort_values(ranked, ascending=False) if ranked in shares.columns else shares,
         width="stretch",
     )
 

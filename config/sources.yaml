@@ -171,6 +171,303 @@ geodata:
     licence: CC-BY-4.0
     verified: 2026-10-06
 
+  - id: jrc_flood_protection_standards
+    url: https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/PESETAIV/Paper_floods/floodProtection_v2019_paper.zip
+    landing: https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/PESETAIV/Paper_floods/
+    access: download
+    crs: EPSG:3035          # verified on the raster 2026-10-24, 500 m cells
+    purpose: >
+      JRC PESETA IV flood protection standards: per 500 m cell, the return period
+      the local defences are designed to hold (2 to 10,000 years). The hazard maps
+      draw the water as if no dyke stood in its way, so a count of people in the
+      RP100 footprint is the UNDEFENDED exposure. Masking every cell whose standard
+      is at least the scenario's return period gives the residual exposure - the
+      people the water still reaches once the defences hold - which is the figure
+      a flood risk management plan is about. scripts/build_exposure.py --protection.
+    caveat: >
+      A design standard, not a guarantee: a dyke built for 1-in-100 can fail
+      earlier, and the 2019 standards were derived for an older generation of the
+      hazard maps than the v3.1.1 rasters in this kit. Values 2..10000, nodata -1;
+      10,000 is a real standard (all 22,572 such cells are in the Netherlands, the
+      coastal dyke rings), not a fill value. Where the raster has no value the
+      cell is treated as unprotected, which keeps the figure an upper bound there.
+      One GeoTIFF, 980,287 B zipped and about 252 MB unpacked.
+    licence: CC-BY-4.0     # copyright.txt beside the file, checked 2026-10-24
+    verified: 2026-10-24
+
+  - id: ghsl_pop_europe_2010
+    url: https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/GHSL/GHS_POP_GLOBE_R2023A/GHS_POP_E2010_GLOBE_R2023A_54009_1000/V1-0/GHS_POP_E2010_GLOBE_R2023A_54009_1000_V1_0.zip
+    access: download
+    crs: ESRI:54009          # same grid as ghsl_pop_europe
+    purpose: >
+      GHS-POP for the 2010 epoch, on exactly the 2025 grid (317,876,163 B). With
+      ghsl_built_europe_2010 it answers whether people and buildings kept moving
+      into the floodplain after the Floods Directive (2007): the same footprint,
+      the same masks, two epochs - an evaluation of a policy rather than a
+      description of a risk.
+    caveat: >
+      An epoch of a modelled grid, not a census: GHSL redistributes census counts
+      onto built-up surface, so a change between epochs mixes real change with
+      improvements in the input data. Compare shares within a region, and quote
+      the change with that caveat.
+    licence: CC-BY-4.0
+    verified: 2026-10-24
+
+  - id: ghsl_built_europe_2010
+    url: https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/GHSL/GHS_BUILT_S_GLOBE_R2023A/GHS_BUILT_S_E2010_GLOBE_R2023A_54009_1000/V1-0/GHS_BUILT_S_E2010_GLOBE_R2023A_54009_1000_V1_0.zip
+    access: download
+    crs: ESRI:54009          # same grid as ghsl_built_europe
+    purpose: >
+      GHS-BUILT-S for the 2010 epoch (149,485,394 B), the asset half of the
+      2010-to-2025 comparison above: square metres built inside the RP100
+      footprint, then and now, per region.
+    caveat: >
+      Same units trap as ghsl_built_europe: square metres per cell, not a share.
+      Same epoch caveat as ghsl_pop_europe_2010.
+    licence: CC-BY-4.0
+    verified: 2026-10-24
+
+  - id: gisco_healthcare
+    url: https://gisco-services.ec.europa.eu/pub/healthcare/2023_v2025_11/gpkg/EU.gpkg
+    landing: https://gisco-services.ec.europa.eu/pub/healthcare/
+    access: download
+    crs: EPSG:4326          # GeoPackage points; read and reprojected by src/facilities.py
+    purpose: >
+      Eurostat GISCO hospitals, from Member States' official sources (5,697,536 B).
+      Article 6(5) of the Floods Directive asks the risk maps to show the
+      consequences for, among others, hospitals: this counts the hospitals inside
+      each return period's flood footprint, per region. Official data, which is
+      why it replaces the Overpass query for this question.
+    caveat: >
+      "Hospital" is defined by each Member State (metadata_v2025_11.pdf), so a
+      count compares national definitions as much as hospitals - the same
+      comparability problem the brief raises about the APSFR declarations. Use
+      the public EU.gpkg only; the folder named EU_DONOTDISSEMINATEOUTSIDE_EC is
+      not for redistribution. Licence: the GISCO terms of use (credit "Source:
+      Eurostat - GISCO"), not CC BY.
+    licence: GISCO terms of use
+    verified: 2026-10-24
+
+  - id: gisco_education
+    url: https://gisco-services.ec.europa.eu/pub/education/2023_2026_01/gpkg/EU.gpkg
+    landing: https://gisco-services.ec.europa.eu/pub/education/
+    access: download
+    crs: EPSG:4326
+    purpose: >
+      Eurostat GISCO schools and education sites (96,026,624 B), counted per
+      region and return period like gisco_healthcare: a school in the footprint
+      is both a consequence and a shelter that may not be usable.
+    caveat: >
+      Coverage and the definition of an education site vary by Member State, as
+      for hospitals. GISCO terms of use, not CC BY.
+    licence: GISCO terms of use
+    verified: 2026-10-24
+
+  - id: efas_flood_thresholds
+    url: https://confluence.ecmwf.int/download/attachments/242067380/
+    landing: https://confluence.ecmwf.int/display/CEMS/Auxiliary+Data
+    access: download
+    crs: EPSG:4326          # EFAS v5 grid, 1 arcmin
+    files:
+      - flood_threshold_efas_v5.1_rl_1.5.nc
+      - flood_threshold_efas_v5.1_rl_2.0.nc
+      - flood_threshold_efas_v5.1_rl_5.0.nc
+      - flood_threshold_efas_v5.1_rl_10.0.nc
+      - flood_threshold_efas_v5.1_rl_20.0.nc
+      - flood_threshold_efas_v5.1_rl_50.0.nc
+      - flood_threshold_efas_v5.1_rl_100.0.nc
+      - flood_threshold_efas_v5.1_rl_200.0.nc
+      - flood_threshold_efas_v5.1_rl_500.0.nc
+    purpose: >
+      EFAS v5.1 river-discharge return levels, one NetCDF per return period
+      (1-in-1.5 to 1-in-500, about 54 MB each). With the EFAS reanalysis of July
+      2021 (efas_historical_july_2021) they say where the river went past its
+      1-in-100 or 1-in-500 level - the JRC's own model turning "July 2021" into
+      a return period, river cell by river cell.
+    caveat: >
+      Fitted on 1992-01-01 to 2022-12-31 (Gumbel, L-moments), per the EFAS FAQ
+      and every v5.x release page of the CEMS wiki; v5.1 is a minor release of
+      the same run as the version_5_0 reanalysis on EWDS, so the two match. But
+      2021 sits INSIDE the fitting window: July 2021 helped set the return levels
+      it is measured against - say so beside any "1-in-N" for 2021. Every land
+      cell carries a threshold; river cells come from efas_upstream_area. EFAS
+      in operation in July 2021 was v4.2 (5 km), not these. Discharge in m3/s.
+    licence: CEMS-FLOODS licence (credit "Contains modified Copernicus Emergency Management Service information 2026")
+    verified: 2026-10-24
+
+  - id: efas_upstream_area
+    url: https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/CEMS-EFAS/LISFLOOD_static_and_parameter_maps_for_EFAS/v1.1.2_OS-LISFLOOD-v4.x/Catchments_morphology_and_river_network/upArea_European_01min.nc
+    access: download
+    crs: EPSG:4326          # EFAS v5 grid, 1 arcmin, 4530 x 2970
+    purpose: >
+      Upstream drainage area per EFAS v5 cell (53,893,073 B, no account): what
+      tells a river cell (>= 150 km2, the floor of the hazard maps and of EFAS's
+      own products) from a hillslope, since every land cell carries a return
+      level. src/efas.py reads it.
+    caveat: >
+      From the open LISFLOOD static maps for EFAS v5 (OS-LISFLOOD v4.x set); the
+      EWDS `upstream_area` field is the same quantity but identity at file level
+      is not verified. Check units (m2) before thresholding.
+    licence: CC-BY-4.0
+    verified: 2026-10-24
+
+  - id: emo1_precipitation_2021
+    url: https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/CEMS-EFAS/meteorological_forcings/EMO-1arcmin/pr/EMO-1arcmin-pr_2021.nc
+    access: download
+    crs: EPSG:4326
+    purpose: >
+      EMO-1 observed daily precipitation, 1 arcmin, 2021 (351,452,529 B): the
+      rain of 13-15 July 2021 per region - the surface-runoff side of the event
+      that the river hazard maps leave out.
+    caveat: >
+      Interpolated from station observations (EFAS meteorological forcing), not
+      radar. Daily totals; the peak hour is not in it.
+    licence: CC-BY-4.0
+    verified: 2026-10-24
+
+  - id: efas_rapid_impact_archive
+    url: https://european-flood.emergency.copernicus.eu/
+    access: api
+    purpose: >
+      EFAS Rapid Impact Assessment archive, public after a 30-day embargo
+      through the anonymous WMS layer mapserver:RapidImpactAssessment
+      (GetFeatureInfo as JSON, from 2019-10-07): population affected with and
+      without flood protection, per forecast. The official counterpart of the
+      kit's undefended versus residual reading. Probed 2026-10-24 near Liege:
+      13 July 2021 12 UTC, 170,300 protected and 259,600 unprotected.
+    caveat: >
+      EFAS v4.2 forecasts, 3-arcsec GHS-POP 2020, flooded from 0.099 m - a
+      different threshold from the kit's 0.5 m. The response does not name its
+      region; match it by location before quoting.
+    verified: 2026-10-24
+
+  - id: efas_historical_july_2021
+    url: https://ewds.climate.copernicus.eu/datasets/efas-historical
+    access: api
+    purpose: >
+      EFAS reanalysis river discharge, 6-hourly, 1 arcmin, 1-31 July 2021, for a
+      box over the Meuse, Vesdre and Ahr (N52 W3 S49 E8): 124 fields by the EWDS
+      costing endpoint, under the 1,500-field limit, plus the static
+      upstream_area field (cost 1, whole domain, ~54 MB) that src/efas.py needs
+      to tell a river cell from a hillslope - every land cell carries a
+      threshold. Fetched by scripts/fetch_efas_july2021.py through the
+      EWDS API with EWDS_API_KEY from .env.
+    caveat: >
+      Needs the user's ECMWF account and the CEMS-FLOODS licence accepted on the
+      dataset page; a request without it fails with a licence error. A
+      pre-event errand, never a venue fetch.
+    licence: CEMS-FLOODS licence
+    verified: 2026-10-24
+
+  - id: hera_sealed_fraction
+    url: https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/CEMS-EFAS/HERA/VER1-0/Data/NetCDF/socioeconomic_maps/landuse/
+    access: download
+    crs: EPSG:4326          # 1 arcmin, the EFAS grid
+    files:
+      - fracsealed_European_01min_2010.nc
+      - fracsealed_European_01min_2020.nc
+    purpose: >
+      HERA sealed-soil fraction per 1 arcmin cell, 2010 and 2020 (about 10 MB
+      each): sealed share per region and its change over the decade, the same
+      epochs as the GHSL comparison, with no account. The runoff side of flood
+      risk that the river hazard maps leave out.
+    caveat: >
+      About 1.8 km cells: a regional trend, not a street map. A fraction, so it
+      is averaged by area, never summed. The 100 m CLMS imperviousness layer is
+      the finer reading where the account allows it.
+    licence: CC-BY-4.0
+    verified: 2026-10-24
+
+  - id: hera_river_discharge
+    url: https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/CEMS-EFAS/HERA/VER2-0/Data/NetCDF/river_discharge/
+    # `folder`, not `download`: 30 files of about 2.3 GB would turn every
+    # `python -m src.fetch` into a 69 GB job. scripts/fetch_hera.py downloads
+    # them on purpose, resumable, one year at a time.
+    access: folder
+    crs: EPSG:4326
+    files:
+      - dis.HERA_v2_1991.nc
+      - dis.HERA_v2_1992.nc
+      - dis.HERA_v2_1993.nc
+      - dis.HERA_v2_1994.nc
+      - dis.HERA_v2_1995.nc
+      - dis.HERA_v2_1996.nc
+      - dis.HERA_v2_1997.nc
+      - dis.HERA_v2_1998.nc
+      - dis.HERA_v2_1999.nc
+      - dis.HERA_v2_2000.nc
+      - dis.HERA_v2_2001.nc
+      - dis.HERA_v2_2002.nc
+      - dis.HERA_v2_2003.nc
+      - dis.HERA_v2_2004.nc
+      - dis.HERA_v2_2005.nc
+      - dis.HERA_v2_2006.nc
+      - dis.HERA_v2_2007.nc
+      - dis.HERA_v2_2008.nc
+      - dis.HERA_v2_2009.nc
+      - dis.HERA_v2_2010.nc
+      - dis.HERA_v2_2011.nc
+      - dis.HERA_v2_2012.nc
+      - dis.HERA_v2_2013.nc
+      - dis.HERA_v2_2014.nc
+      - dis.HERA_v2_2015.nc
+      - dis.HERA_v2_2016.nc
+      - dis.HERA_v2_2017.nc
+      - dis.HERA_v2_2018.nc
+      - dis.HERA_v2_2019.nc
+      - dis.HERA_v2_2020.nc
+    purpose: >
+      HERA v2 reanalysis river discharge, 6-hourly, 1 arcmin, 1991-2020: the
+      OBSERVED trend in annual peak discharge per river cell and per region -
+      the counterpart of the projected change the kit already carries.
+    caveat: >
+      A model forced by reanalysis, not gauges; it ends in 2020. v2 rather than
+      v1, which over-states late increases through groundwater return flow.
+      About 69 GB for the 30 years.
+    licence: CC-BY-4.0
+    verified: 2026-10-24
+
+  - id: cems_rapid_mapping_activations
+    url: https://rapidmapping.emergency.copernicus.eu/backend/dashboard-api/public-activations-info/?limit=1000
+    access: api
+    purpose: >
+      The public list of CEMS rapid-mapping activations (anonymous JSON): how
+      often the EU's emergency mapping was called for floods, by country and
+      year. Context for the brief; scripts/cems_activations.py summarises it.
+    caveat: >
+      Covers the activations the public dashboard lists (EMSR656 onwards, from
+      2023); older ones such as EMSR517/518 are on the S3 path above.
+    verified: 2026-10-24
+
+  - id: c3s_ecde_climate_indicators
+    url: https://cds.climate.copernicus.eu/datasets/sis-ecde-aggregated-climate-indicators
+    access: api
+    purpose: >
+      C3S European Climate Data Explorer indicators aggregated by region:
+      maximum 5-day precipitation and extreme precipitation, by global warming
+      level - the pluvial counterpart of the discharge projections.
+    caveat: >
+      Published at NUTS2 at the finest: a NUTS3 region inherits its parent's
+      value, and the column says so. Needs the CDS key and the CC BY licence
+      accepted on the dataset page.
+    licence: CC-BY-4.0
+    verified: 2026-10-24
+
+  - id: clms_imperviousness_2018
+    url: https://land.copernicus.eu/en/products/high-resolution-layer-imperviousness
+    access: api
+    purpose: >
+      CLMS Imperviousness Density 2018, 100 m, Europe, EPSG:3035
+      (IMD_2018_100m_eu_03035_v020, 66 MB): sealed share per region and inside
+      the RP100 footprint, a surface-runoff proxy.
+    caveat: >
+      Downloaded by hand after EU Login (a human errand, like CORINE): put the
+      GeoTIFF under data/raw/download/clms_imperviousness_2018/. Values 0-100 %
+      sealed. Credit "Generated using European Union's Copernicus Land
+      Monitoring Service information".
+    licence: CC-BY-4.0
+    verified: 2026-10-24
+
   - id: ghsl_pop_100m_tiles
     url: https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/GHSL/GHS_POP_GLOBE_R2023A/GHS_POP_E2025_GLOBE_R2023A_54009_100/V1-0/tiles/
     access: download
@@ -1209,6 +1506,26 @@ policy_corpus:  # the "cite or refuse" RAG corpus
       later figures (about 74,000 claims) remain press-sourced and are not
       declared.
     verified: 2026-10-12
+
+  # The paper behind the hazard maps the whole kit counts on. It is the source
+  # for the sentence a JRC juror will check first: the maps model no flood
+  # protection, so a headcount in the RP100 footprint is an undefended figure.
+  - id: jrc_hazard_maps_validation_essd_2022
+    url: https://essd.copernicus.org/articles/14/1549/2022/essd-14-1549-2022.pdf
+    access: scrape
+    purpose: >
+      Dottori et al., "A new dataset of river flood hazard maps for Europe and
+      the Mediterranean Basin", Earth System Science Data 14, 1549-1569 (2022),
+      JRC110216, doi:10.5194/essd-14-1549-2022, open access. The validation of
+      the map series: on average about two-thirds of the reference flood extent
+      reproduced, over-estimation at the frequent return periods, and no flood
+      protection modelled - which is why scripts/build_exposure.py --protection
+      exists.
+    caveat: >
+      Validates the 2022 generation; the kit reads v3.1.1 rasters (README dated
+      2026-03-05), so the paper documents the method rather than these exact
+      files. 20,457,008 B PDF, robots.txt allows all, verified 2026-10-24.
+    verified: 2026-10-24
 
 context:  # know your jury
   - id: fari_manifesto

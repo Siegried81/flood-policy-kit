@@ -294,7 +294,7 @@ def test_the_map_and_the_ranking_read_the_same_period():
     # The choropleth and the ranking carry the period in their own headings, so
     # a screenshot of either one states which flood it is.
     assert "Where the danger is — 1-in-100 year flood" in said
-    assert "Ranked: exposed population, 1-in-100 year flood" in said
+    assert "Ranked: share of residents exposed, 1-in-100 year flood" in said
     assert "Ranked on the **1-in-100 year** scenario" in said
 
 
@@ -365,7 +365,7 @@ def test_the_map_says_how_to_build_geometry_it_does_not_have():
     # The download was tried and why it failed is on the page, not swallowed.
     assert "offline in this test" in said
     # And the ranking still works without it.
-    assert "Ranked: exposed population" in said
+    assert "Ranked: share of residents exposed" in said
 
 
 def test_the_choropleth_colours_the_regions_and_greys_the_unmeasured():
@@ -834,7 +834,7 @@ def test_the_context_tab_says_how_to_build_a_table_it_does_not_have():
     assert app_test.exception == []
     assert "scripts/build_context.py" in said
     # And the rest of the page is unaffected: the map is the deliverable.
-    assert "exposed population" in said.lower()
+    assert "residents exposed" in said.lower()
 
 
 def test_a_single_member_period_is_not_reported_as_model_disagreement():
@@ -1222,3 +1222,20 @@ def test_a_spec_outside_the_whitelist_is_shown_as_a_refusal(monkeypatch):
     assert app_test.exception == [], app_test.exception
     assert "Query refused" in _texts(app_test)
     assert "unknown column '__import__'" in _texts(app_test)
+
+
+def test_the_ranked_chart_is_ordered_by_its_value_not_by_region_code():
+    """`st.bar_chart` orders bars by label unless told otherwise, so the
+    "ranked" chart ran alphabetically by NUTS code and the table under it was
+    sorted by absolute count right below a caption saying not to."""
+    import json
+
+    with _frozen(_nested_table()):
+        app_test = AppTest.from_file(str(APP), default_timeout=60).run()
+        chart = app_test.get("vega_lite_chart")[0]
+        table = app_test.dataframe[0].value
+    spec = json.loads(chart.proto.spec)
+    encoding = spec.get("encoding") or spec["layer"][0]["encoding"]
+    assert encoding["x"]["sort"] == {"field": "exposed_share", "order": "descending"}
+    shares = table["exposed_share"].dropna().tolist()
+    assert shares == sorted(shares, reverse=True)

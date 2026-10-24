@@ -470,11 +470,12 @@ def test_every_organisation_spent_still_falls_back_locally(keyed):
 
     answer = rag.complete_with_provider("prompt")
 
-    assert len(carried) == 5, "all five tried"
+    count = len(rag.GROQ_KEY_VARS)
+    assert len(carried) == count, "every configured key tried"
     assert answer.provider == "ollama"
-    assert "Tried 5 keys" in answer.fallback_reason
+    assert f"Tried {count} keys" in answer.fallback_reason
     # The roll call names the variables, and no key value is in the message.
-    assert "GROQ_API_KEY_5" in answer.fallback_reason
+    assert rag.GROQ_KEY_VARS[-1] in answer.fallback_reason
     assert "fake-" not in answer.fallback_reason
 
 
@@ -728,3 +729,14 @@ def test_no_real_key_or_tracing_flag_survives_into_a_test():
     leaked = [n for n in (*rag.GROQ_KEY_VARS, "ANTHROPIC_API_KEY", "LANGSMITH_TRACING",
                           "LANGSMITH_API_KEY") if os.environ.get(n)]
     assert leaked == []
+
+
+def test_every_groq_key_set_is_tried_not_only_the_first_five(monkeypatch):
+    """A sixth key sat in .env and was never tried because the list stopped at
+    `_5`. Every `GROQ_API_KEY_N` set, up to nine, joins the rotation in order."""
+    for name in rag.GROQ_KEY_VARS:
+        monkeypatch.delenv(name, raising=False)
+    for name in ("GROQ_API_KEY", "GROQ_API_KEY_2", "GROQ_API_KEY_6"):
+        monkeypatch.setenv(name, "gsk_test")
+    assert rag.groq_keys() == ["GROQ_API_KEY", "GROQ_API_KEY_2", "GROQ_API_KEY_6"]
+    assert rag.GROQ_KEY_VARS[-1] == "GROQ_API_KEY_9"

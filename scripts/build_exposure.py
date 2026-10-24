@@ -63,7 +63,8 @@ import numpy as np
 import pandas as pd
 import rasterio
 from rasterio.io import MemoryFile
-from rasterio.warp import transform_bounds
+from rasterio.enums import Resampling
+from rasterio.warp import reproject, transform_bounds
 from rasterio.windows import Window
 from rasterstats import zonal_stats
 
@@ -77,6 +78,11 @@ HAZARD_DIR = ROOT / "data" / "raw" / "download" / "jrc_flood_hazard"
 POP_ZIP = ROOT / "data" / "raw" / "download" / "ghsl_pop_europe.zip"
 BOUNDARIES = ROOT / "data" / "raw" / "download" / "gisco_nuts3.geojson"
 OUT = ROOT / "data" / "processed" / "exposure.parquet"
+PROTECTION_ZIP = ROOT / "data" / "raw" / "download" / "jrc_flood_protection_standards.zip"
+#: The residual table never overwrites the undefended one: they answer two
+#: different questions, and `exposure.parquet` is what every UI and the brief
+#: quote. `scripts/build_context.py` carries the residual figures from here.
+PROTECTED_OUT = ROOT / "data" / "processed" / "exposure_protected.parquet"
 
 #: One finished return period, parked on disk before the next one starts.
 #:
@@ -95,16 +101,21 @@ OUT = ROOT / "data" / "processed" / "exposure.parquet"
 PARTS = ROOT / "data" / "processed" / "exposure_parts"
 
 
-def _part_path(return_period: int, *, mode: str, min_depth_m: float, masks: list[str]) -> Path:
+def _part_path(
+    return_period: int, *, mode: str, min_depth_m: float, masks: list[str],
+    protected: bool = False,
+) -> Path:
     """Where one finished return period is parked. Named by what it measures.
 
     One mask alone names WHICH one, because keeping the permanent water and
     keeping the spurious areas are two measurements with the same mask count.
     Both masks and none keep the bare count, the names the parts on disk were
-    built under, so a rerun still finds them.
+    built under, so a rerun still finds them. A run behind the flood
+    protection standards is tagged `_prot`: the same return period, a different
+    figure, and the two must never be assembled into one table.
     """
     masks_tag = f"m{len(masks)}" if len(masks) != 1 else f"m1-{Path(masks[0]).stem}"
-    tag = f"rp{return_period}_{mode}_d{min_depth_m}_{masks_tag}"
+    tag = f"rp{return_period}_{mode}_d{min_depth_m}_{masks_tag}" + ("_prot" if protected else "")
     return PARTS / f"{tag}.parquet"
 
 #: `Europe_RP100_filled_depth.tif` -> 100. The directory also holds the two
@@ -248,8 +259,18 @@ def total_population(pop_path: str, admin: gpd.GeoDataFrame) -> pd.Series:
     return period, so building the nine periods as nine processes - which is how
     a 16 GB machine survives the heavy ones - would otherwise repeat this pass
     nine times for an identical answer.
+
+    The cache is named after the raster it summed. It used to be one fixed
+    `total_pop.parquet`, so the first caller to fill it answered for every
+    raster after it: measured 2026-10-24, the 2010 epoch run read the 2025
+    totals back and reported exactly 446,267,469 EU-27 residents for both
+    years. The 2025 grid keeps the original name, so the parts already on disk
+    are still found.
     """
-    cache = PARTS / "total_pop.parquet"
+    stem = Path(pop_path.split("!")[-1]).stem
+    default_stem = Path(population_path().split("!")[-1]).stem if POP_ZIP.exists() else None
+    name = "total_pop.parquet" if stem == default_stem else f"total_pop_{stem}.parquet"
+    cache = PARTS / name
     if cache.exists():
         parked = pd.read_parquet(cache)["total_pop"]
         if len(parked) == len(admin):
@@ -376,6 +397,47 @@ def _population_only(pop, pop_window: Window, admin: gpd.GeoDataFrame):
     return counts, totals
 
 
+def protection_path() -> str:
+    """A GDAL `zip://` URI for the JRC flood protection standards raster."""
+    if not PROTECTION_ZIP.exists():
+        raise SystemExit(
+            f"{PROTECTION_ZIP.relative_to(ROOT)} is missing: fetch the "
+            "`jrc_flood_protection_standards` entry of config/sources.yaml "
+            "with src.fetch.fetch_source."
+        )
+    with zipfile.ZipFile(PROTECTION_ZIP) as archive:
+        tifs = [n for n in archive.namelist() if n.lower().endswith(".tif")]
+    if len(tifs) != 1:
+        raise SystemExit(f"Expected exactly one .tif in {PROTECTION_ZIP.name}, found {tifs}")
+    return f"zip://{PROTECTION_ZIP.as_posix()}!/{tifs[0]}"
+
+
+def protected_cells(band_shape, band_transform, band_crs, protection, return_period: int):
+    """Hazard cells the local defences hold at this return period.
+
+    The JRC protection standard of a cell is the return period its defences are
+    designed for, so in a 1-in-`return_period` flood the cell stays dry when
+    that standard is at least `return_period`. The 500 m standards are read onto
+    the hazard window by NEAREST neighbour: a standard is a category of the
+    place, and averaging a 1-in-50 cell with a 1-in-1000 one invents a dyke
+    nobody built. Cells the standards raster does not cover read -1 and are
+    never protected, which leaves the figure an upper bound there.
+    """
+    standards = np.full(band_shape, -1.0, dtype="float32")
+    reproject(
+        source=rasterio.band(protection, 1),
+        destination=standards,
+        src_transform=protection.transform,
+        src_crs=protection.crs,
+        src_nodata=protection.nodata,
+        dst_transform=band_transform,
+        dst_crs=band_crs,
+        dst_nodata=-1.0,
+        resampling=Resampling.nearest,
+    )
+    return standards >= return_period
+
+
 def _exposure_one_period(
     hazard_path: str,
     pop_path: str,
@@ -385,6 +447,8 @@ def _exposure_one_period(
     min_depth_m: float,
     mode: str,
     masks: list[str],
+    protection: str | None = None,
+    return_period: int | None = None,
 ) -> pd.DataFrame:
     """`exposed_pop`, `hazard_coverage` and `cells_counted` for one return period.
 
@@ -405,7 +469,14 @@ def _exposure_one_period(
     cell is set to the hazard's own nodata before being measured, so it leaves
     both the exposed count and the coverage denominator. Read per window, never
     whole: each mask is the same 5.7-billion-cell grid.
+
+    `protection`, when given, is the flood protection standards raster: every
+    cell its defences hold at `return_period` is set to the hazard's nodata,
+    which this layer reads as dry - observed, nobody exposed - so the coverage
+    does not move and only the exposed count does.
     """
+    if protection is not None and return_period is None:
+        raise ValueError("a protected run needs the return period it is masked at")
     windows = _stripes(pop_path, stripes)
     exposed = pd.Series(0.0, index=admin.index)
     covered = pd.Series(0.0, index=admin.index)
@@ -418,6 +489,9 @@ def _exposure_one_period(
         pop = stack.enter_context(rasterio.open(pop_path))
         nodata = src.nodata
         mask_sources = [stack.enter_context(rasterio.open(HAZARD_DIR / m)) for m in masks]
+        protection_src = (
+            stack.enter_context(rasterio.open(protection)) if protection else None
+        )
         for mask_src in mask_sources:
             if mask_src.shape != src.shape or mask_src.transform != src.transform:
                 raise SystemExit(
@@ -444,6 +518,13 @@ def _exposure_one_period(
                 flagged = mask_src.read(1, window=haz_window)
                 band[np.isfinite(flagged) & (flagged == 1.0)] = nodata
                 del flagged
+            if protection_src is not None:
+                held = protected_cells(
+                    band.shape, src.window_transform(haz_window), src.crs,
+                    protection_src, return_period,
+                )
+                band[held] = nodata
+                del held
             profile = dict(src.profile)
             profile.update(
                 height=band.shape[0],
@@ -558,6 +639,13 @@ def main() -> int:
              "exposure_parts/ instead of reusing them.",
     )
     parser.add_argument(
+        "--protection",
+        action="store_true",
+        help="Mask every cell the JRC flood protection standards hold at each "
+             "return period and write the RESIDUAL exposure to "
+             "data/processed/exposure_protected.parquet, never over exposure.parquet.",
+    )
+    parser.add_argument(
         "--no-indicators",
         dest="indicators",
         action="store_false",
@@ -585,6 +673,10 @@ def main() -> int:
     print(f"mode={args.mode} min_depth_m={args.min_depth_m} stripes={args.stripes}")
     print(f"masked out: {', '.join(masks) if masks else 'nothing'}")
 
+    protection = protection_path() if args.protection else None
+    out = PROTECTED_OUT if protection else OUT
+    print(f"flood protection standards: {'applied' if protection else 'not applied'} -> {out.name}")
+
     print("counting residents per unit...", flush=True)
     totals = total_population(pop_path, admin)
 
@@ -592,7 +684,8 @@ def main() -> int:
     frames = []
     for return_period in sorted(paths):
         parked = _part_path(
-            return_period, mode=args.mode, min_depth_m=args.min_depth_m, masks=masks
+            return_period, mode=args.mode, min_depth_m=args.min_depth_m, masks=masks,
+            protected=protection is not None,
         )
         if parked.exists() and not args.rebuild:
             frames.append(pd.read_parquet(parked))
@@ -603,7 +696,7 @@ def main() -> int:
         part = _exposure_one_period(
             paths[return_period], pop_path, admin,
             stripes=args.stripes, min_depth_m=args.min_depth_m, mode=args.mode,
-            masks=masks,
+            masks=masks, protection=protection, return_period=return_period,
         )
         frame = pd.DataFrame({
             "nuts_id": admin["nuts_id"].values,
@@ -637,7 +730,10 @@ def main() -> int:
     # computed; it must not narrow the frozen table, or a targeted rebuild of one
     # period would silently replace a nine-period table with a one-period one that
     # looks complete to every reader of `exposure.parquet`.
-    tag = _part_path(0, mode=args.mode, min_depth_m=args.min_depth_m, masks=masks).name
+    tag = _part_path(
+        0, mode=args.mode, min_depth_m=args.min_depth_m, masks=masks,
+        protected=protection is not None,
+    ).name
     suffix = tag.split("_", 1)[1]
     parked = sorted(
         PARTS.glob(f"rp*_{suffix}"),
@@ -675,14 +771,14 @@ def main() -> int:
     else:
         print("indicators: SKIPPED (--no-indicators), one indicator in the table")
 
-    OUT.parent.mkdir(parents=True, exist_ok=True)
+    out.parent.mkdir(parents=True, exist_ok=True)
     # Written beside the target and renamed, so a crash mid-write cannot leave
     # the UIs reading half a table.
-    partial = OUT.with_suffix(".parquet.part")
+    partial = out.with_suffix(".parquet.part")
     table.to_parquet(partial, index=False)
-    partial.replace(OUT)
+    partial.replace(out)
 
-    print(f"\n{len(table)} rows -> {OUT.relative_to(ROOT)} ({OUT.stat().st_size:,} B)")
+    print(f"\n{len(table)} rows -> {out.relative_to(ROOT)} ({out.stat().st_size:,} B)")
     cov = table["hazard_coverage"]
     print(
         f"hazard_coverage: min {cov.min():.3f}, mean {cov.mean():.3f}, "

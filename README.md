@@ -109,6 +109,9 @@ flood-policy-kit/
 │   ├── build_context.py             # freezes data/processed/context.parquet, what qualifies an exposure figure
 │   ├── fetch_cds_member.py          # CDS ensemble members, each verified against what was asked
 │   ├── build_geometry.py            # freezes data/processed/regions.geojson, the choropleth's polygons
+│   ├── export_bi.py                 # the frozen tables as CSV (+ TopoJSON) for the Power BI project in bi/
+│   ├── build_bi_report.py           # writes the Power BI report (PBIR): six story pages, theme, drillthrough
+│   ├── validate_bi_report.py        # checks every bi/ JSON file against Microsoft's vendored schemas
 │   ├── docs_numbers.py              # measures the figures the docs quote and rewrites every marked copy
 │   └── check_offline_readiness.py   # is this laptop demo-ready with the Wi-Fi off?
 ├── api/main.py                 # JSON API over src/, for the React UI
@@ -140,7 +143,7 @@ the same wheel again with nothing reinstalled. **The policy moves both ways, so
 measure rather than believe either state** — measured 2026-10-14 it blocked
 `import rasterio` again; measured 2026-10-23 it allows it, and the Windows venv
 collects the whole suite, as the WSL2 venv does:
-**<!-- numbers:tests_collected -->760<!-- /numbers --> collected, nothing deselected, all passing** (the
+**<!-- numbers:tests_collected -->861<!-- /numbers --> collected, nothing deselected, all passing** (the
 climate dry-run test that used to read the CDS files already in `data/` now
 honours its patched directory). The WSL2 venv stays, because it is the only route that does
 not depend on the policy's mood and it is where a continental raster build
@@ -190,7 +193,9 @@ never published; build it locally.
 | [`docs/policy_craft.md`](docs/policy_craft.md) | How to write the brief and the pitch |
 | [`docs/responsible_ai.md`](docs/responsible_ai.md) | The HLEG grid, the AI-usage log, what AI must not decide |
 | [`docs/day_of.md`](docs/day_of.md) | Hour-by-hour plan for 29–30 October |
-| [`docs/roles.md`](docs/roles.md) | Your three hats, and how to split a multidisciplinary team |
+| [`docs/roles.md`](docs/roles.md) | Your five hats, and role cards for a team formed on the day |
+| [`docs/coach_questions.md`](docs/coach_questions.md) | What to ask each coach, by background |
+| [`docs/power_bi.md`](docs/power_bi.md) | The Power BI project: opening it, the six story pages, drill-down and drill-through, the model and measures, the map to add |
 | [`docs/workflow.md`](docs/workflow.md) | Why a workflow and not an agent, and where the human gate sits |
 | [`docs/decisions.md`](docs/decisions.md) | The dated record of every change to what a number means. Read it before quoting a figure from an older run |
 | [`docs/limitations.md`](docs/limitations.md) | What the figures cannot say, what was designed and not built, what an authority would still have to do, and the risks accepted to ship in ten days |
@@ -206,7 +211,7 @@ neither pytest nor rasterio.
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m pytest -q           # <!-- numbers:tests_collected -->760<!-- /numbers --> tests, offline: no network, no model
+.venv/bin/python -m pytest -q           # <!-- numbers:tests_collected -->861<!-- /numbers --> tests, offline: no network, no model
                                         # All collected and passing 2026-10-23 on
                                         # Windows. Smart App Control blocks
                                         # rasterio on Windows some days and not
@@ -221,6 +226,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python scripts/build_exposure.py --stripes 72 # -> data/processed/exposure.parquet
 .venv/bin/python scripts/build_context.py  --stripes 72 # -> data/processed/context.parquet
 .venv/bin/python scripts/build_geometry.py             # -> data/processed/regions.geojson
+.venv/bin/python scripts/export_bi.py                  # -> bi/data/, read by bi/FloodPolicyKit.pbip (docs/power_bi.md)
 .venv/bin/python scripts/check_offline_readiness.py   # exits 1 if the demo needs the network
 .venv/bin/python scripts/check_offline_readiness.py --strict  # evening before: a WARN blocks too
 .venv/bin/python scripts/docs_numbers.py --check      # exits 1 if a doc's number no longer matches the code

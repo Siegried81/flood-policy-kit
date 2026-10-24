@@ -25,7 +25,7 @@ shapely>=2.2.0
 # logged as CodeIntegrity 3077/3089/3118, with no pin that fixed it - and by
 # 2026-10-08 around 11:00 it allowed the same wheel again with nothing
 # reinstalled. Measured 2026-10-12: it blocks `import rasterio` again, and the
-# WHOLE suite runs in WSL2, <!-- numbers:tests_collected -->760<!-- /numbers --> passed
+# WHOLE suite runs in WSL2, <!-- numbers:tests_collected -->861<!-- /numbers --> passed
 # and nothing deselected (the count is written by scripts/docs_numbers.py).
 #
 # Keep the WSL2 venv (`~/venvs/flood-policy-kit` on Ubuntu) anyway: it is the only
@@ -51,6 +51,8 @@ cdsapi>=0.7.7         # ONLY scripts/fetch_cds_member.py, a pre-event errand;
 # Analysis
 pandas>=3.0.6
 numpy>=2.5.4
+xarray>=2026.9.0      # src/efas.py, src/hera.py: lazy NetCDF slices, never a whole file
+netCDF4>=1.7.5        # the NetCDF-4/HDF5 engine xarray reads EFAS and HERA files with
 
 # App + maps
 streamlit>=1.66.0
@@ -67,6 +69,7 @@ python-dotenv>=1.2.4    # reads .env, so an unset key means "unavailable" and no
 
 # Dev
 pytest>=9.1.1
+jsonschema>=4.26.0     # scripts/validate_bi_report.py: the Power BI files against Microsoft's schemas
 
 # API for the React UI
 fastapi>=0.146.0

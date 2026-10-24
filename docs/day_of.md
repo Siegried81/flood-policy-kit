@@ -1,7 +1,22 @@
 # Day of — 29 and 30 October 2026
 
-The detailed programme comes from the organisers; this is the shape to hold
-regardless of what the timetable says.
+The programme below is the organisers' (FARI practical-information PDF and the
+e-mail of 12 October 2026); the right-hand column is what to do inside it.
+
+## Access — no ID, no entry
+
+- **Thursday 29:** FARI, Kantersteen 10-12, 1000 Brussels (BeCentral campus).
+  Ring the doorbell. Registration 08:15-09:00, breakfast served; latecomers
+  may not be let in. Day 1 is **mandatory** to take part in Day 2.
+- **Friday 30:** JRC, Rue du Champ de Mars 21, 1050 Ixelles. Registration
+  08:00-09:00 per the PDF, 08:15 per the e-mail: be there at 08:00.
+- **V-PASS:** the Commission's visitor registration. The link arrives by e-mail
+  a few days before (check spam); register at once. The QR code it returns is
+  the entry ticket, on the phone or printed - bring both.
+- **The same ID document** as the one given to V-PASS, on Friday.
+- **A second e-mail**, a couple of days before, carries the dataset access and
+  the **AI licences**. Read it the evening it arrives: the datasets it names
+  may not be the ones this kit downloaded, and that is better found at home.
 
 ## Before you leave home
 
@@ -40,24 +55,27 @@ regardless of what the timetable says.
       sockets), and a phone hotspot.
 - [ ] The repo is public and the URL fits on a slide.
 
-## Thursday 29 — FARI
+## Thursday 29 — FARI (08:15-19:00)
 
-| Time | What | The thing that actually matters |
+Teams are formed on the day, with students from other backgrounds. This kit is
+something you bring, not something the team has agreed to: show it once the
+scenario is known, as an offer, and let the question lead.
+
+| Time | Programme | The thing that actually matters |
 |---|---|---|
-| 09:00–10:30 | Team forms, roles split | **Write the decision-maker's question on the whiteboard in one sentence.** Everything is judged against it. Do not start coding before it is written. |
-| 10:30–13:00 | Data | Get to one real number early, even a rough one. A team with a number at noon is calm; a team with a pipeline at noon is not. |
-| 14:00–17:00 | Analysis | Add the **equity lens** (who, not how many) and one **sensitivity check**. These two are what separate the top three teams. |
+| 09:00-12:30 | Welcome (FARI & JRC), introduction to the flood datasets, **scenario briefing**, session "How to write an impactful policy brief" | Listen for the decision-maker and the scale in the scenario. **Write the decision-maker's question in one sentence** before lunch; everything is judged against it. |
+| 13:30-18:00 | Data exploration and analysis, mentoring (technical & policy), drafting visual outputs and the brief | Get to one real number early. Then add the **equity lens** (who, not how many) and one **sensitivity check** - these separate the top three teams. Use the mentors on the question, not on debugging. |
 | 17:30 | **Freeze the numbers** | Everything written after this quotes the frozen table. No exceptions. |
-| Evening | Draft the brief's bottom line | Writing it tonight reveals whether the analysis actually supports a recommendation, while there is still a morning to fix it. |
+| 18:00-19:00 | Drinks at FARI | |
+| Evening | Draft the brief's bottom line | Writing it tonight reveals whether the analysis supports a recommendation, while there is still a morning to fix it. |
 
-## Friday 30 — JRC
+## Friday 30 — JRC (08:00-18:00)
 
-| Time | What | The thing that actually matters |
+| Time | Programme | The thing that actually matters |
 |---|---|---|
-| Morning | Map and brief, in parallel | Two owners, one each. They check each other's numbers against the frozen table once, at 12:00. |
-| 13:30 | **Freeze the brief** | |
-| 14:00–15:00 | Two full rehearsals | Timed, out loud, standing. The first one always runs long. |
-| Afternoon | Jury | |
+| 09:00-13:30 | Final analysis and synthesis, mentoring from JRC experts, finalising visual outputs and the brief | Map and brief in parallel, two owners. They check each other's numbers against the frozen table once, at 12:00. **Freeze the brief at 13:30.** |
+| 14:00-17:00 | **Final submission:** the 2-page policy brief, the visual outputs, the AI usage summary; then the jury | Submit first, rehearse after: two timed run-throughs, out loud, standing. The AI usage summary is `docs/ai_usage_log.md`, kept as you go. |
+| After | Award ceremony, drinks at the JRC | |
 
 ## The pitch — 3 minutes
 

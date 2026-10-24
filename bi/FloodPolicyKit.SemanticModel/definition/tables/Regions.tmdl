@@ -1,0 +1,314 @@
+table Regions
+	lineageTag: 49512f81-c31d-5cac-b346-90601a8f2269
+
+	column nuts_id
+		dataType: string
+		lineageTag: 3a464d17-bfc1-55e2-a559-11610b52b3ec
+		summarizeBy: none
+		sourceColumn: nuts_id
+
+		annotation SummarizationSetBy = User
+
+	column region
+		dataType: string
+		lineageTag: 1893b1ce-4613-5d41-ba57-4dd5b2988a31
+		summarizeBy: none
+		sourceColumn: region
+
+		annotation SummarizationSetBy = User
+
+	column country
+		dataType: string
+		lineageTag: ebd537a6-20ec-55a8-9fd7-9f913ecfa861
+		summarizeBy: none
+		sourceColumn: country
+
+		annotation SummarizationSetBy = User
+
+	column country_name
+		dataType: string
+		lineageTag: 6c010162-350e-5b9a-ae5b-5874b139f06c
+		summarizeBy: none
+		sourceColumn: country_name
+
+		annotation SummarizationSetBy = User
+
+	column total_pop
+		dataType: double
+		lineageTag: d0f20dfa-cc9e-52b5-aa66-01dfb961c519
+		summarizeBy: sum
+		sourceColumn: total_pop
+
+		annotation SummarizationSetBy = User
+
+	column share_over_65
+		dataType: double
+		lineageTag: fb70c5f8-93bf-566d-b386-3b49a68b8194
+		summarizeBy: none
+		sourceColumn: share_over_65
+
+		annotation SummarizationSetBy = User
+
+	column poverty_rate_pct
+		dataType: double
+		lineageTag: 9d388b00-ca5c-5af6-9f52-00fb52b27f4e
+		summarizeBy: none
+		sourceColumn: poverty_rate_pct
+
+		annotation SummarizationSetBy = User
+
+	column is_eu27
+		dataType: boolean
+		lineageTag: eb93da21-38db-541c-bb97-9213c87f85e8
+		summarizeBy: none
+		sourceColumn: is_eu27
+
+		annotation SummarizationSetBy = User
+
+	column expected_annual_exposure
+		dataType: double
+		lineageTag: 2ba24ecf-c388-5f66-8aec-88e3dc761ede
+		summarizeBy: sum
+		sourceColumn: expected_annual_exposure
+
+		annotation SummarizationSetBy = User
+
+	column expected_annual_exposure_closed
+		dataType: double
+		lineageTag: 53aedb1d-5dd7-5a5f-9b68-1ab80edef281
+		summarizeBy: sum
+		sourceColumn: expected_annual_exposure_closed
+
+		annotation SummarizationSetBy = User
+
+	column shared_basin_share
+		dataType: double
+		lineageTag: dc0b11e7-fa37-5ecd-9331-a77cbd838ba3
+		summarizeBy: none
+		sourceColumn: shared_basin_share
+
+		annotation SummarizationSetBy = User
+
+	column basin_area_share
+		dataType: double
+		lineageTag: a04c965c-fb00-5089-ba6b-516fdda53130
+		summarizeBy: none
+		sourceColumn: basin_area_share
+
+		annotation SummarizationSetBy = User
+
+	column basin_countries_max
+		dataType: int64
+		lineageTag: d70c84e7-32cb-5dc7-95ce-f9172b96ff02
+		summarizeBy: none
+		sourceColumn: basin_countries_max
+
+		annotation SummarizationSetBy = User
+
+	column apsfr_share
+		dataType: double
+		lineageTag: e19ed03d-de26-51f0-8419-c8cdb731b765
+		summarizeBy: none
+		sourceColumn: apsfr_share
+
+		annotation SummarizationSetBy = User
+
+	column apsfr_declared
+		dataType: boolean
+		lineageTag: 15785005-8018-5244-97ee-b502a8005b11
+		summarizeBy: none
+		sourceColumn: apsfr_declared
+
+		annotation SummarizationSetBy = User
+
+	column apsfr_country_reported
+		dataType: boolean
+		lineageTag: 04abd43c-63ea-5af9-9394-33dc94932531
+		summarizeBy: none
+		sourceColumn: apsfr_country_reported
+
+		annotation SummarizationSetBy = User
+
+	column built_share_exposed_rp100
+		dataType: double
+		lineageTag: e1608ed7-4833-57c5-b8d8-c9a37308a886
+		summarizeBy: none
+		sourceColumn: built_share_exposed_rp100
+
+		annotation SummarizationSetBy = User
+
+	column natura2000_flooded_share_rp100
+		dataType: double
+		lineageTag: 1f090c37-f0ef-5095-a022-335d01ee317a
+		summarizeBy: none
+		sourceColumn: natura2000_flooded_share_rp100
+
+		annotation SummarizationSetBy = User
+
+	column gdp_meur
+		dataType: double
+		lineageTag: 38f0c219-fcf7-53cc-bd3f-1052fcb7eb15
+		summarizeBy: sum
+		sourceColumn: gdp_meur
+
+		annotation SummarizationSetBy = User
+
+	column pop_density_per_km2
+		dataType: double
+		lineageTag: e4ad68c6-033a-5e87-abb9-e15def9d4f9a
+		summarizeBy: none
+		sourceColumn: pop_density_per_km2
+
+		annotation SummarizationSetBy = User
+
+	column household_income_pps_per_hab
+		dataType: double
+		lineageTag: d46585b4-d17d-50cb-a33e-bb5a01ab7dfb
+		summarizeBy: none
+		sourceColumn: household_income_pps_per_hab
+
+		annotation SummarizationSetBy = User
+
+	column change_pct_ensemble_median_2011_2040
+		dataType: double
+		lineageTag: 01aec16c-9487-5d92-9bd9-ca986ff0c36c
+		summarizeBy: none
+		sourceColumn: change_pct_ensemble_median_2011_2040
+
+		annotation SummarizationSetBy = User
+
+	column change_pct_ensemble_p25_2011_2040
+		dataType: double
+		lineageTag: ca0a4377-ac7a-5ae1-b377-eba2b328bbee
+		summarizeBy: none
+		sourceColumn: change_pct_ensemble_p25_2011_2040
+
+		annotation SummarizationSetBy = User
+
+	column change_pct_ensemble_p75_2011_2040
+		dataType: double
+		lineageTag: b6f3abd5-2c57-551d-a2a5-a032934053a3
+		summarizeBy: none
+		sourceColumn: change_pct_ensemble_p75_2011_2040
+
+		annotation SummarizationSetBy = User
+
+	column ensemble_agrees_on_sign_2011_2040
+		dataType: boolean
+		lineageTag: 5bd705df-3a5a-500c-bb1e-fe9a6a8535be
+		summarizeBy: none
+		sourceColumn: ensemble_agrees_on_sign_2011_2040
+
+		annotation SummarizationSetBy = User
+
+	column change_pct_ensemble_median_2041_2070
+		dataType: double
+		lineageTag: 06f5a2f9-92c1-56e8-b361-a534ec1b54a7
+		summarizeBy: none
+		sourceColumn: change_pct_ensemble_median_2041_2070
+
+		annotation SummarizationSetBy = User
+
+	column change_pct_ensemble_p25_2041_2070
+		dataType: double
+		lineageTag: d7d9c101-4480-5de9-a81a-a959da6a63ae
+		summarizeBy: none
+		sourceColumn: change_pct_ensemble_p25_2041_2070
+
+		annotation SummarizationSetBy = User
+
+	column change_pct_ensemble_p75_2041_2070
+		dataType: double
+		lineageTag: 9cd3bf13-aa8c-5375-83fb-12b7f8b4b241
+		summarizeBy: none
+		sourceColumn: change_pct_ensemble_p75_2041_2070
+
+		annotation SummarizationSetBy = User
+
+	column ensemble_agrees_on_sign_2041_2070
+		dataType: boolean
+		lineageTag: 0f41feb6-fecd-5a0c-ad9a-97c01b165b7a
+		summarizeBy: none
+		sourceColumn: ensemble_agrees_on_sign_2041_2070
+
+		annotation SummarizationSetBy = User
+
+	column change_pct_ensemble_median_2071_2100
+		dataType: double
+		lineageTag: aa22c7f3-527d-5d6f-a8d6-cc681abfa8e9
+		summarizeBy: none
+		sourceColumn: change_pct_ensemble_median_2071_2100
+
+		annotation SummarizationSetBy = User
+
+	column change_pct_ensemble_p25_2071_2100
+		dataType: double
+		lineageTag: e6ad782f-5657-53bc-be3f-85925c987641
+		summarizeBy: none
+		sourceColumn: change_pct_ensemble_p25_2071_2100
+
+		annotation SummarizationSetBy = User
+
+	column change_pct_ensemble_p75_2071_2100
+		dataType: double
+		lineageTag: 08ce04df-7c50-56cb-9697-a3b26cd176be
+		summarizeBy: none
+		sourceColumn: change_pct_ensemble_p75_2071_2100
+
+		annotation SummarizationSetBy = User
+
+	column ensemble_agrees_on_sign_2071_2100
+		dataType: boolean
+		lineageTag: b273d774-f863-57fc-a55a-822008d4d360
+		summarizeBy: none
+		sourceColumn: ensemble_agrees_on_sign_2071_2100
+
+		annotation SummarizationSetBy = User
+
+	column shared_with
+		dataType: string
+		lineageTag: 3200a9db-1427-5851-b682-c21a074ee6b5
+		summarizeBy: none
+		sourceColumn: shared_with
+
+		annotation SummarizationSetBy = User
+
+	column shared_basins
+		dataType: string
+		lineageTag: 489bb2ae-a4e4-5990-a2ac-310a7978189c
+		summarizeBy: none
+		sourceColumn: shared_basins
+
+		annotation SummarizationSetBy = User
+
+	column main_shared_basin
+		dataType: string
+		lineageTag: 16c679e4-d692-5a27-bf70-d44749acc720
+		summarizeBy: none
+		sourceColumn: main_shared_basin
+
+		annotation SummarizationSetBy = User
+
+	/// Country, then region: the path every drill-down in the report follows.
+	hierarchy Geography
+		lineageTag: 3f9ab530-d77d-506e-bd15-9bbd905dae1e
+
+		level Country
+			lineageTag: 4281bf5c-aef9-5ffa-ad0c-4bc0dc39a21f
+			column: country_name
+
+		level Region
+			lineageTag: 7ff874fd-1b08-5b85-affa-35f9a9f90fac
+			column: region
+
+	partition Regions = m
+		mode: import
+		source =
+				let
+				    Source = Csv.Document(File.Contents(DataFolder & "regions.csv"), [Delimiter = ",", Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
+				    Promoted = Table.PromoteHeaders(Source, [PromoteAllScalars = true]),
+				    Typed = Table.TransformColumnTypes(Promoted, {{"nuts_id", type text}, {"region", type text}, {"country", type text}, {"country_name", type text}, {"total_pop", type number}, {"share_over_65", type number}, {"poverty_rate_pct", type number}, {"is_eu27", type logical}, {"expected_annual_exposure", type number}, {"expected_annual_exposure_closed", type number}, {"shared_basin_share", type number}, {"basin_area_share", type number}, {"basin_countries_max", Int64.Type}, {"apsfr_share", type number}, {"apsfr_declared", type logical}, {"apsfr_country_reported", type logical}, {"built_share_exposed_rp100", type number}, {"natura2000_flooded_share_rp100", type number}, {"gdp_meur", type number}, {"pop_density_per_km2", type number}, {"household_income_pps_per_hab", type number}, {"change_pct_ensemble_median_2011_2040", type number}, {"change_pct_ensemble_p25_2011_2040", type number}, {"change_pct_ensemble_p75_2011_2040", type number}, {"ensemble_agrees_on_sign_2011_2040", type logical}, {"change_pct_ensemble_median_2041_2070", type number}, {"change_pct_ensemble_p25_2041_2070", type number}, {"change_pct_ensemble_p75_2041_2070", type number}, {"ensemble_agrees_on_sign_2041_2070", type logical}, {"change_pct_ensemble_median_2071_2100", type number}, {"change_pct_ensemble_p25_2071_2100", type number}, {"change_pct_ensemble_p75_2071_2100", type number}, {"ensemble_agrees_on_sign_2071_2100", type logical}, {"shared_with", type text}, {"shared_basins", type text}, {"main_shared_basin", type text}}, "en-US")
+				in
+				    Typed
+
+	annotation PBI_ResultType = Table

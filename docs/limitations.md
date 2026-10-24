@@ -18,6 +18,19 @@ rebuilt. The findings and recommendations themselves are in
   happened in Wallonia in July 2021. A region the model ranks low may still have
   flooded. [`policy_answer.md` §9](policy_answer.md#9-what-this-document-does-not-claim),
   [`src/events.py`](../src/events.py) module docstring.
+- **No dykes in the water.** The maps "do not account for the influence of
+  local flood defences, in particular dyke systems" (Dottori et al. 2022, on
+  the previous generation, `jrc_hazard_maps_validation_essd_2022` in the
+  corpus; v3.1.1 comes from the same EFAS/LISFLOOD chain, and EFAS's own rapid
+  impact assessment runs it "unprotected" and "protected"), so every headcount in
+  `exposure.parquet` is UNDEFENDED: the people the water would reach if no
+  defence held. That is why it is two orders of magnitude above the JRC's own
+  "about 160,000 people exposed each year" (defended, and weighted by
+  probability). The residual reading behind the PESETA IV protection standards
+  is in `context.parquet` as `residual_exposed_pop_rp*`; quote the two
+  together. The same paper finds the maps reproduce about two-thirds of the
+  reference flood extent and over-estimate it below RP100.
+  [`config/sources.yaml`](../config/sources.yaml) `jrc_flood_protection_standards`.
 - **Nine scenarios, never a sum.** The return periods are nested extents: EU-27
   exposed population reads 16,704,818 at RP10, 25,737,004 at RP100 and
   30,730,197 at RP500. A headcount quoted without its return period is not a
